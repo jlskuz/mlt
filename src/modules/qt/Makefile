@@ -1,9 +1,9 @@
 include ../../../config.mak
 include config.mak
 
-CFLAGS := -I../.. $(CFLAGS)
+CFLAGS := -I../.. -I. $(CFLAGS)
 
-LDFLAGS := -L../../framework -lmlt -lpthread -lm -L../../mlt++ -lmlt++ $(LDFLAGS)
+LDFLAGS := -L../../framework -lmlt -lpthread -lm -L../../mlt++ -lmlt++ -L. -lQmlRenderer $(LDFLAGS)
 
 TARGET = ../libmltqt$(LIBSUF)
 
@@ -16,7 +16,9 @@ CPPOBJS = common.o \
 	kdenlivetitle_wrapper.o \
 	producer_qtext.o \
 	transition_qtblend.o \
-	filter_qtblend.o
+	filter_qtblend.o \
+	producer_qml.o \
+	qml_wrapper.o
 
 ifdef USE_QT_OPENGL
 	CPPOBJS += consumer_qglsl.o

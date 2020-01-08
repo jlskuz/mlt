@@ -113,8 +113,9 @@ else
 		# Qt5 on Linux, BSD, or Windows
 		if [ -f "$qt_libdir/libQt5Core.so" ] || [ -f "$qt_libdir/libQt5Core.a" ]
 		then
-			echo QTCXXFLAGS=-I$qt_includedir -I$qt_includedir/QtCore -I$qt_includedir/QtGui -I$qt_includedir/QtXml -I$qt_includedir/QtSvg -I$qt_includedir/QtWidgets >> config.mak
-			echo QTLIBS=-Wl,-rpath-link,"$qt_libdir" -L"$qt_libdir" -lQt5Core -lQt5Gui -lQt5Xml -lQt5Svg -lQt5Widgets >> config.mak
+			echo QTCXXFLAGS=-I$qt_includedir -I$qt_includedir/QtCore -I$qt_includedir/QtGui -I$qt_includedir/QtXml -I$qt_includedir/QtSvg -I$qt_includedir/QtWidgets -I$qt_includedir/QtQml -I$qt_includedir/QtOpenGL -I$qt_includedir/QtQuick  >> config.mak
+			echo QTLIBS=-Wl,-rpath-link,"$qt_libdir" -L"$qt_libdir" -lQt5Core -lQt5Gui -lQt5Xml -lQt5Svg -lQt5Widgets -lQt5Qml -lQt5OpenGL -lQt5Quick >> config.mak
+
 		# Qt5 on OS X
 		elif [ -d "$qt_libdir/QtWidgets.framework" ]
 		then
@@ -124,23 +125,26 @@ else
 				-I$qt_includedir/QtXml -I$qt_libdir/QtXml.framework/Headers \
 				-I$qt_includedir/QtSvg -I$qt_libdir/QtSvg.framework/Headers \
 				-I$qt_includedir/QtWidgets -I$qt_libdir/QtWidgets.framework/Headers \
+				-I$qt_includedir/QtQml -I$qt_libdir/QtWidgets.framework/Headers \
+                                -I$qt_includedir/QtOpenGL -I$qt_libdir/QtWidgets.framework/Headers \
+                                -I$qt_includedir/QtQuick -I$qt_libdir/QtWidgets.framework/Headers \
 				>> config.mak
 			echo QTLIBS=-F"$qt_libdir" -framework QtCore -framework QtGui -framework \
-				QtXml -framework QtSvg -framework QtWidgets >> config.mak
+				QtXml -framework QtSvg -framework QtWidgets QtXml -framework QtQml -framework QtOpenGL -framework QtQuick >> config.mak
 		# Qt4 on OS X
 		elif [ -d "$qt_libdir/QtGui.framework" ]
 		then
-			echo QTCXXFLAGS=$(pkg-config --cflags QtCore QtGui QtXml QtSvg QtOpenGL) >> config.mak
-			echo QTLIBS=$(pkg-config --libs QtCore QtGui QtXml QtSvg QtOpenGL) >> config.mak
+			echo QTCXXFLAGS=$(pkg-config --cflags QtCore QtGui QtXml QtSvg QtQml QtOpenGL) >> config.mak
+                        echo QTLIBS=$(pkg-config --libs QtCore QtGui QtXml QtSvg QtQml QtOpenGL) >> config.mak
 		# Qt4 on Windows
 		elif [ -f "$qt_libdir/libQtCore4.a" ]
 		then
-			echo QTCXXFLAGS=-I$qt_includedir -I$qt_includedir/QtCore -I$qt_includedir/QtGui -I$qt_includedir/QtXml -I$qt_includedir/QtSvg -I$qt_includedir/QtOpenGL >> config.mak
+			echo QTCXXFLAGS=-I$qt_includedir -I$qt_includedir/QtCore -I$qt_includedir/QtGui -I$qt_includedir/QtXml -I$qt_includedir/QtSvg -I$qt_includedir/QtOpenGL -I$qt_includedir/QtQuick >> config.mak
 			echo QTLIBS=-Wl,-enable-auto-import -L$qt_libdir -lQtCore4 -lQtGui4 -lQtXml4 -lQtSvg4 -lQtOpenGL4 >> config.mak
 		# Qt4 on Linux or BSD
 		else
-			echo QTCXXFLAGS=-I$qt_includedir  -I$qt_includedir/QtCore -I$qt_includedir/QtGui -I$qt_includedir/QtXml -I$qt_includedir/QtSvg -I$qt_includedir/QtOpenGL >> config.mak
-			echo QTLIBS=-L$qt_libdir -lQtCore -lQtGui -lQtXml -lQtSvg -lQtOpenGL >> config.mak
+			echo QTCXXFLAGS=-I$qt_includedir  -I$qt_includedir/QtCore -I$qt_includedir/QtGui -I$qt_includedir/QtXml -I$qt_includedir/QtSvg -I$qt_includedir/QtOpenGL -I$qt_includedir/QtQuick >> config.mak
+                        echo QTLIBS=-L$qt_libdir -lQtCore -lQtGui -lQtXml -lQtSvg -lQtOpenGL -lQtQuick  >> config.mak
 		fi
 	else
 		pkg-config --exists 'Qt5Gui'
@@ -148,15 +152,15 @@ else
 		then
 			echo "- Qt version 5.x detected"
 			without_kde=true
-			echo QTCXXFLAGS=$(pkg-config --cflags Qt5Core Qt5Gui Qt5Xml Qt5Svg Qt5Widgets) >> config.mak
-			echo QTLIBS=$(pkg-config --libs Qt5Core Qt5Gui Qt5Xml Qt5Svg Qt5Widgets) >> config.mak
+			echo QTCXXFLAGS=$(pkg-config --cflags Qt5Core Qt5Gui Qt5Xml Qt5Svg Qt5Widgets Qt5OpenGL Qt5Qml Qt5Quick) >> config.mak
+                        echo QTLIBS=$(pkg-config --libs Qt5Core Qt5Gui Qt5Xml Qt5Svg Qt5Widgets Qt5OpenGL Qt5Qml Qt5Quick ) >> config.mak
 		else
 			pkg-config --exists 'QtGui >= 4'
 			if [ $? -eq 0 ]
 			then
 				echo "- Qt version 4.x detected"
-				echo QTCXXFLAGS=$(pkg-config --cflags QtCore QtGui QtXml QtSvg QtOpenGL) >> config.mak
-				echo QTLIBS=$(pkg-config --libs QtCore QtGui QtXml QtSvg QtOpenGL) >> config.mak
+				echo QTCXXFLAGS=$(pkg-config --cflags QtCore QtGui QtXml QtSvg QtOpenGL QtQuick) >> config.mak
+                                echo QTLIBS=$(pkg-config --libs QtCore QtGui QtXml QtSvg QtOpenGL Qt5Quick) >> config.mak
 			else
 				echo "- Qt not found - disabling"
 				touch ../disable-qt
