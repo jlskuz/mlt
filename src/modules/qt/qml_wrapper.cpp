@@ -42,15 +42,11 @@ void renderKdenliveTitle(producer_ktitle_qml self, mlt_frame frame,
                          mlt_image_format format, int width, int height,
                          double position, int force_refresh)
 {
-
       // Obtain the producer
       mlt_producer producer = &self->parent;
       mlt_properties producer_props = MLT_PRODUCER_PROPERTIES(producer);
-
       mlt_properties properties = MLT_FRAME_PROPERTIES(frame);
-
       pthread_mutex_lock(&self->mutex);
-
       self->current_image = NULL;
       mlt_properties_set_data( producer_props, "_cached_image", NULL, 0, NULL, NULL );
 
@@ -78,7 +74,8 @@ void renderKdenliveTitle(producer_ktitle_qml self, mlt_frame frame,
       //TODO: Write code for no resource scenario,  write code to parse in loadFromQml()
       img.fill(0);
 
-      self->renderer->render(img);
+      QImage rendered_img = self->renderer->render(img.width(), img.height(), img.format());
+      memcpy(img.scanLine(0), rendered_img.constBits(), img.width() * img.height()*4);
 
       self->format = mlt_image_rgb24a;
       convert_qimage_to_mlt_rgba(&img, self->rgba_image, width, height);
