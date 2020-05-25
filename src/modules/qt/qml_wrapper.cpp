@@ -42,11 +42,19 @@
 #include <QWaitCondition>
 #include <QtCore/QAnimationDriver>
 
+/*
+	QmlRenderer can be used to load a QML file and rendered to return a rendered QImage. QmlRenderer uses QQuickRenderControl to render the Qt Quick content on to a FBO, which can then be saved to an QImage.
+	A custom QAnimationDriver is used and installed in order to advance animations according to the project FPS instead of the default value of 60 FPS for QML animations.
+	In case of an animated qml file, a specific frame can be seeked by passing a frame number to the overloaded render() function of QmlRenderer class.
+
+	The rendering itself takes places in a separate thread, taken care by QmlCoreRenderer class where it maintains its own QOpenGL Context and related GL calls are made from this thread. This is done so as to prevent clashes from OpenGL calls of applications using the producer from the same thread.
+	Polishing takes place in main thread. Syncing and rendering takes place in the render thread whilst the main thread is blocked. The two classes communicate using QEvents.
+*/
+
 static const QEvent::Type INIT = QEvent::Type(QEvent::User + 1);
 static const QEvent::Type RENDER = QEvent::Type(QEvent::User + 2);
 static const QEvent::Type RESIZE = QEvent::Type(QEvent::User + 3);
 static const QEvent::Type STOP = QEvent::Type(QEvent::User + 4);
-static const QEvent::Type UPDATE = QEvent::Type(QEvent::User + 5);
 class QmlAnimationDriver : public QAnimationDriver
 {
 private:
@@ -66,38 +74,20 @@ public:
 	{
 		return m_elapsed;
 	}
-
-
 };
-
 
 class QmlCoreRenderer : public QObject
 {
-private:
-
-    QWaitCondition m_cond;
-    QMutex m_mutex;
-    QOpenGLContext* m_context;
-    QOffscreenSurface* m_offscreenSurface;
-    QQuickRenderControl* m_renderControl;
-    QQuickWindow* m_quickWindow;
-    QOpenGLFramebufferObject* m_fbo;
-    QmlAnimationDriver* m_animationDriver;
-    QImage::Format m_format;
-    QSize m_size;
-    qreal m_dpr;
-    QMutex m_quitMutex;
-    int m_fps;
-    QImage m_image;
 
 public:
-    explicit QmlCoreRenderer(QObject *parent = nullptr):QObject(parent),
-														m_fbo(nullptr),
-														m_animationDriver(nullptr),
-														m_offscreenSurface(nullptr),
-														m_context(nullptr),
-														m_quickWindow(nullptr),
-														m_renderControl(nullptr) {}
+    explicit QmlCoreRenderer(QObject *parent = nullptr)
+	: QObject(parent)
+	, m_fbo(nullptr)
+	, m_animationDriver(nullptr)
+	, m_offscreenSurface(nullptr)
+	, m_context(nullptr)
+	, m_quickWindow(nullptr)
+	, m_renderControl(nullptr) {}
     ~QmlCoreRenderer() override {}
 
     void requestInit() { QCoreApplication::postEvent(this, new QEvent(INIT)); }
@@ -113,7 +103,6 @@ public:
     void setDPR(qreal value) { m_dpr = value; }
     void setFPS(int value) { m_fps = value;}
     void setFormat( QImage::Format f) { m_format = f; }
-    void checkifAnimDriverRunning() { m_animationDriver->isRunning()? qDebug() << " 1 driver running": qDebug() << "2  driver is NOT running :)"; }
     QWaitCondition *cond() { return &m_cond; }
     QMutex *mutex() { return &m_mutex; }
     QImage getRenderedQImage() { return m_image; }
@@ -164,8 +153,10 @@ private:
 		ensureFbo();
 		m_renderControl->sync();
 
-		// NOTE: normally, in a gui application, the main thread would not be blocked whilst rendering takes place on the render thread.
-		// The main thread, in our case,  must wait untill the rendering is done because we only care about the final rendered result
+		/*
+		NOTE: normally, in a gui application, the main thread would not be blocked whilst rendering takes place on the render thread.
+		The main thread, in our case,  must wait untill the rendering is done because we only care about the final rendered result.
+		*/
 
 		m_renderControl->render();
 		m_context->functions()->glFlush();
@@ -197,51 +188,33 @@ private:
 				return QObject::event(e);
 		}
 	}
+
+private:
+    QWaitCondition m_cond;
+    QMutex m_mutex;
+    QOpenGLContext* m_context;
+    QOffscreenSurface* m_offscreenSurface;
+    QQuickRenderControl* m_renderControl;
+    QQuickWindow* m_quickWindow;
+    QOpenGLFramebufferObject* m_fbo;
+    QmlAnimationDriver* m_animationDriver;
+    QImage::Format m_format;
+    QSize m_size;
+    qreal m_dpr;
+    QMutex m_quitMutex;
+    int m_fps;
+    QImage m_image;
 };
 
 
 class QmlRenderer: public QObject
 {
+	// Since we make use of signals and slots of our own we need Qt's moc compilation
     Q_OBJECT
-
-    QOpenGLContext *m_context;
-    QOffscreenSurface *m_offscreenSurface;
-    QQuickRenderControl* m_renderControl;
-    QQuickWindow *m_quickWindow;
-    QQmlEngine *m_qmlEngine;
-    QQmlComponent *m_qmlComponent;
-    QQuickItem *m_rootItem;
-    QOpenGLFramebufferObject *m_fbo;
-    QmlAnimationDriver *m_animationDriver;
-    QmlCoreRenderer *m_corerenderer;
-    QThread *m_rendererThread;
-    enum renderStatus {
-        NotRunning,
-        Initialised
-    };
-
-    qreal m_dpr;
-    QSize m_size;
-    renderStatus m_status;
-    int m_duration;
-    int m_fps;
-    int m_framesCount;
-    mlt_position m_currentFrame;
-    QUrl m_qmlFileUrl;
-    QImage m_frame;
-    mlt_position m_requestedFrame;
-    QImage::Format m_ImageFormat;
-    QImage m_img;
-    mlt_position m_totalFrames;
-    QWaitCondition m_cond;
-    QMutex m_mutex;
-
-signals:
-    void imageReady();
 
 public:
     explicit QmlRenderer(QString qmlFileUrlString, int fps, int duration, QObject *parent = nullptr)
-		    : QObject(parent)
+	: QObject(parent)
     , m_fbo(nullptr)
     , m_animationDriver(nullptr)
     , m_offscreenSurface(nullptr)
@@ -302,15 +275,13 @@ public:
 		m_corerenderer->moveToThread(m_rendererThread);
 		m_rendererThread->start();
 
-		connect(
-			m_quickWindow, &QQuickWindow::sceneGraphError,
-			[=]( QQuickWindow::SceneGraphError error, const QString &message) {
+		connect(m_quickWindow, &QQuickWindow::sceneGraphError,
+			[=](QQuickWindow::SceneGraphError error, const QString &message) {
 				qDebug() << "!!!!!!!! ERROR - QML Scene Graph: " << error << message;
 				}
 		);
-		connect(
-			m_qmlEngine, &QQmlEngine::warnings,
-			[=]( QList<QQmlError> warnings) {
+		connect(m_qmlEngine, &QQmlEngine::warnings,
+			[=](QList<QQmlError> warnings) {
 				foreach(const QQmlError& warning, warnings) {
 					qDebug() << "!!!! QML WARNING : "  << warning << "  " ;
 				}
@@ -343,6 +314,7 @@ public:
     QImage render(int width, int height, QImage::Format format)
 	{
 		init(width, height, format);
+		renderStatic();
 		return m_img;
 	}
 
@@ -353,19 +325,19 @@ public:
 		init(width, height, format);
 		installEventFilter(this);
 
+		// wait till we get the rendered QImage
 		QEventLoop loop;
 		connect(this, &QmlRenderer::imageReady, &loop, &QEventLoop::quit, Qt::QueuedConnection);
 		renderAnimated();
 		loop.exec();
+
 		resetDriver();
+		removeEventFilter(this);
 		delete m_qmlComponent;
 		delete m_rootItem;
 
 		return m_img;
 	}
-
-    void checkCurrentContex() {    m_context->currentContext() == nullptr? qDebug() << "1 Context is Null ": qDebug() << "2 A context was made current!"; }
-    void checkifAnimDriverRunning() { m_animationDriver->isRunning()? qDebug() << " 1 driver running": qDebug() << "2  driver is NOT running :)"; }
 
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override
@@ -381,7 +353,10 @@ protected:
 private:
     void initDriver()
 	{
-		m_animationDriver = new QmlAnimationDriver(1000 / m_fps);
+		// QML animations aren't used to running at fps other than its normal one (60fps) so provide a correction for a couple of frames.
+		int correctedFrames = m_framesCount - 2;
+		int correctedFps = correctedFrames/m_duration;
+		m_animationDriver = new QmlAnimationDriver(1000 / correctedFps);
 		m_animationDriver->install();
 		m_corerenderer->setAnimationDriver(m_animationDriver);
 	}
@@ -486,24 +461,56 @@ private:
 			QEvent *updateRequest = new QEvent(QEvent::UpdateRequest);
 			QCoreApplication::postEvent(this, updateRequest);
 		}
-
 		else {
-			removeEventFilter(this);
+			m_img = m_corerenderer->getRenderedQImage();
 			emit imageReady();
 			return;
 		}
 	}
 
+private:
+    QOpenGLContext *m_context;
+    QOffscreenSurface *m_offscreenSurface;
+    QQuickRenderControl* m_renderControl;
+    QQuickWindow *m_quickWindow;
+    QQmlEngine *m_qmlEngine;
+    QQmlComponent *m_qmlComponent;
+    QQuickItem *m_rootItem;
+    QOpenGLFramebufferObject *m_fbo;
+    QmlAnimationDriver *m_animationDriver;
+    QmlCoreRenderer *m_corerenderer;
+    QThread *m_rendererThread;
+    enum renderStatus {
+        NotRunning,
+        Initialised
+    };
+
+    qreal m_dpr;
+    QSize m_size;
+    renderStatus m_status;
+    int m_duration;
+    int m_fps;
+    int m_framesCount;
+    mlt_position m_currentFrame;
+    QUrl m_qmlFileUrl;
+    QImage m_frame;
+    mlt_position m_requestedFrame;
+    QImage::Format m_ImageFormat;
+    QImage m_img;
+    QWaitCondition m_cond;
+    QMutex m_mutex;
+
+signals:
+    void imageReady();
 };
 
 static void qrenderer_delete(void *data)
 {
-	qDebug() << " HERE IN QRENDERE DELETE " ;
-       QmlRenderer *renderer = (QmlRenderer*) data;
-       if (renderer)
-               delete renderer;
+	QmlRenderer *renderer = (QmlRenderer*) data;
+	if (renderer)
+			delete renderer;
 
-       renderer = NULL;
+	renderer = NULL;
 }
 
 
@@ -548,7 +555,7 @@ int getMaxDuration(QObject *root, int duration)
         }
         return *max_element(durationList.begin(),durationList.end());
     }
-    else if(name.contains("NumberAnimation") || name.contains("ColorAnimation") || name.contains("PauseAnimation") || name.contains("PathAnimation") || name.contains("RotationAnimation")) {
+    else if(name.contains("NumberAnimation") || name.contains("ColorAnimation") || name.contains("PauseAnimation") || name.contains("PathAnimation") || name.contains("RotationAnimation") || name.contains("PropertyAnimation")) {
         int dur = getIntProp(root, "duration");
         return dur;
     }
@@ -639,16 +646,8 @@ void renderKdenliveTitle(producer_ktitle_qml self, mlt_frame frame,
 		img.fill(0);
 		QImage rendered_img;
 		 if (animated) {
-			mlt_position anim_out = mlt_properties_get_position( producer_props, "out" );
-			mlt_position length = mlt_properties_get_position(producer_props, "length");
-
-			if( position > anim_out) {
-				rendered_img = renderer->render(width, height, img.format(), length+1);
-			}
-			else {
-				rendered_img = renderer->render(width, height, img.format(), position);
-			}
-		 }
+			rendered_img = renderer->render(width, height, img.format(), position);
+		}
 		else {
 			rendered_img = renderer->render(width, height, img.format());
 		}
@@ -707,4 +706,5 @@ void renderKdenliveTitle(producer_ktitle_qml self, mlt_frame frame,
 	mlt_properties_set_int(properties, "width", self->current_width);
 	mlt_properties_set_int(properties, "height", self->current_height);
 }
+
 #include "qml_wrapper.moc"
