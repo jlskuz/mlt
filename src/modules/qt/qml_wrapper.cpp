@@ -1,6 +1,8 @@
 /*
  * qml_wrapper.cpp -- QML wrapper
- * Copyright (c) 2019 Akhil K Gangadharan <akhilam512@gmail.com>
+ * Copyright (c) 2019 Akhil K Gangadharan <helloimakhil@gmail.com>
+ * Author: Akhil K Gangadharan based on the code of producer_kdenlivetitle by
+ * Marco Gittler and Jean-Baptiste Mardelle
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -18,6 +20,7 @@
  */
 
 #include "qml_wrapper.h"
+#include "qmlparser.h"
 #include "common.h"
 #include <framework/mlt_log.h>
 #include <QString>
@@ -213,8 +216,8 @@ class QmlRenderer: public QObject
     Q_OBJECT
 
 public:
-    explicit QmlRenderer(QString qmlFileUrlString, int fps, int duration, QObject *parent = nullptr)
-	: QObject(parent)
+    explicit QmlRenderer(QString qmlFileUrlString, int fps, int duration,QObject *parent = nullptr)
+    : QObject(parent)
     , m_fbo(nullptr)
     , m_animationDriver(nullptr)
     , m_offscreenSurface(nullptr)
@@ -222,14 +225,13 @@ public:
     , m_quickWindow(nullptr)
     , m_renderControl(nullptr)
     , m_rootItem(nullptr)
+	, m_qmlComponent(nullptr)
     , m_corerenderer(nullptr)
-    , m_qmlComponent(nullptr)
     , m_qmlEngine(nullptr)
     , m_status(NotRunning)
-    , m_qmlFileUrl(qmlFileUrlString)
+	, m_qmlFileUrl(qmlFileUrlString)
     , m_dpr(1.0)
     , m_duration(duration)
-    , m_fps(fps)
     , m_currentFrame(0)
     , m_framesCount(fps*duration)
 	{
@@ -308,8 +310,10 @@ public:
 
 		delete m_context;
 		delete m_offscreenSurface;
-
+		delete m_qmlComponent;
 	}
+
+	void setRootItem(QQuickItem* item) { m_rootItem = item; }
 
     QImage render(int width, int height, QImage::Format format)
 	{
@@ -320,6 +324,8 @@ public:
 
     QImage render(int width, int height, QImage::Format format, int frame)
 	{
+		m_fps = (m_framesCount/m_duration);
+
 		m_requestedFrame = frame;
 		m_currentFrame = 0;
 		init(width, height, format);
@@ -333,7 +339,6 @@ public:
 
 		resetDriver();
 		removeEventFilter(this);
-		delete m_qmlComponent;
 		delete m_rootItem;
 
 		return m_img;
@@ -393,22 +398,30 @@ private:
 			m_ImageFormat = imageFormat;
 			m_corerenderer->setSize(m_size);
 			m_corerenderer->setFormat(m_ImageFormat);
-			loadInput();
+			bool ok = loadInput();
+			Q_ASSERT(ok);
 			m_corerenderer->requestInit();
 			m_status = Initialised;
 		}
 	}
 
-    void loadInput()
+    bool loadInput()
 	{
-		m_qmlComponent = new QQmlComponent(m_qmlEngine, QUrl(m_qmlFileUrl), QQmlComponent::PreferSynchronous);
+		m_qmlComponent = new QQmlComponent(m_qmlEngine, QUrl(m_qmlFileUrl),QQmlComponent::PreferSynchronous);
 		Q_ASSERT(!m_qmlComponent->isNull() || m_qmlComponent->isReady());
 		bool assert = loadRootObject();
 		Q_ASSERT(assert);
+		if (!m_rootItem) {
+			qDebug()<< "ERROR - run: Not a QQuickItem - QML file INVALID ";
+			return false;
+		}
+		m_rootItem->setParentItem(m_quickWindow->contentItem());
 		Q_ASSERT(!m_size.isEmpty());
 		m_rootItem->setWidth(m_size.width());
 		m_rootItem->setHeight(m_size.height());
 		m_quickWindow->setGeometry(0, 0, m_size.width(), m_size.height());
+
+		return true;
 	}
 
     void polishSyncRender()
@@ -424,8 +437,8 @@ private:
 
     bool loadRootObject()
 	{
-	    if(!checkQmlComponent()) {
-        return false;
+		if(!checkQmlComponent()) {
+			return false;
 		}
 		Q_ASSERT(m_qmlComponent->create() != nullptr);
 		QObject *rootObject = m_qmlComponent->create();
@@ -436,7 +449,7 @@ private:
 		}
 		m_rootItem = qobject_cast<QQuickItem*>(rootObject);
 		if (!m_rootItem) {
-			qDebug()<< "ERROR - run: Not a QQuickItem - QML file INVALID ";
+			qDebug()<< "ERROR run: Invalid QQuickItem ";
 			delete rootObject;
 			return false;
 		}
@@ -444,14 +457,14 @@ private:
 		return true;
 	}
 
-    bool checkQmlComponent()
+   bool checkQmlComponent()
 	{
 		if (m_qmlComponent->isError()) {
-			const QList<QQmlError> errorList = m_qmlComponent->errors();
-			for (const QQmlError &error : errorList) {
-				qDebug() <<"QML Component Error: " << error.url() << error.line() << error;
-			}
-			return false;
+				const QList<QQmlError> errorList = m_qmlComponent->errors();
+				for (const QQmlError &error : errorList) {
+						qDebug() <<"QML Component Error: " << error.url() << error.line() << error;
+				}
+				return false;
 		}
 		return true;
 	}
@@ -491,7 +504,7 @@ private:
     QQuickRenderControl* m_renderControl;
     QQuickWindow *m_quickWindow;
     QQmlEngine *m_qmlEngine;
-    QQmlComponent *m_qmlComponent;
+	QQmlComponent *m_qmlComponent;
     QQuickItem *m_rootItem;
     QOpenGLFramebufferObject *m_fbo;
     QmlAnimationDriver *m_animationDriver;
@@ -531,57 +544,54 @@ static void qrenderer_delete(void *data)
 }
 
 
-int getIntProp(QObject* object, QString propertyName)
+QVariant getMetaPropValue(QObject* object, QString propertyName, int propertyIndex)
 {
-    for(int i=0; i<object->metaObject()->propertyCount(); i++) {
-        QMetaProperty prop = object->metaObject()->property(i);
-        if(prop.name() == propertyName) {
-            int propertyValue = prop.read(object).toInt();
-            if(propertyValue > 0) {
-				if(propertyName == QString("duration"))
-					propertyValue = propertyValue/1000; //convert from milliseconds to seconds
-
-                return propertyValue;
-            }
-        }
-    }
-    return 0;
+		QMetaProperty prop = object->metaObject()->property(propertyIndex);
+		if(prop.name() == propertyName) {
+			QVariant propertyValue = prop.read(object);
+			if(propertyValue.isValid()) {
+				return propertyValue;
+			}
+			else
+			{
+				qDebug() << " FATAL --- Error in parsing metaObject(): Invalid QVariant \n";
+				return propertyValue;
+			}
+		}
+		else {
+			qDebug() << " FATAL --- Error in parsing metaObject(): Invalid property index";
+		}
 }
 
-int getMaxDuration(QObject *root, int duration)
+void traverseQml(QObject *root, mlt_properties properties, mlt_profile profile)
 {
     if (root == nullptr)
-        return 0;
+        return;
 
     QString name = root->metaObject()->className();
-    if(name.contains("Sequential")) {
-        std::vector<int> durationList;
-        int dur_seq = 0;
-        foreach(QObject* child, root->children()) {
-            int childDuration = getMaxDuration(child);
-			dur_seq += childDuration;
-        }
-        return dur_seq;
+	if(name == QString("QQuickTimeline")) {
+		bool enabled = getMetaPropValue(root, "enabled", 6).toBool();
+		// Only one timeline should be enabled at a time
+		if(enabled) {
+			qreal anim_duration = getMetaPropValue(root, "endFrame", 2).toReal();
+			int length = (anim_duration/1000) * mlt_profile_fps(profile);
 
-    }
-    else if(name.contains("Parallel")) {
-        std::vector<int> durationList;
-        int dur_par = 0;
-        for(auto &child: root->children()) {
-            durationList.push_back(getMaxDuration(child));
-        }
-        return *max_element(durationList.begin(),durationList.end());
-    }
-    else if(name.contains("NumberAnimation") || name.contains("ColorAnimation") || name.contains("PauseAnimation") || name.contains("PathAnimation") || name.contains("RotationAnimation") || name.contains("PropertyAnimation")) {
-        int dur = getIntProp(root, "duration");
-        return dur;
+			mlt_properties_set_position(properties, "length", length);
+			mlt_properties_set_position(properties, "kdenlive:duration", length);
+			mlt_properties_set_position(properties, "out", length - 1);
+		}
+		foreach(QObject* child, root->children()) {
+			traverseQml(child, properties, profile);
+		}
+	}
+    else if(name.contains("TimelineAnimation")) {
+        int dur = getMetaPropValue(root, "duration", 5).toInt();
+		dur /= 1000; // convert to seconds
+		mlt_properties_set_position(properties, "duration", dur);
     }
     else {
         foreach(QObject* child, root->children()) {
-            int duration = getMaxDuration(child);
-			if( duration > 0) {
-				return duration;
-			}
+            traverseQml(child, properties, profile);
 		}
 	}
 }
@@ -646,7 +656,11 @@ void renderKdenliveTitle(producer_ktitle_qml self, mlt_frame frame,
 				pthread_mutex_unlock(&self->mutex);
 				return;
 			}
-			renderer = new QmlRenderer(mlt_properties_get( producer_props, "resource"), fps, anim_duration);
+			char* resource = mlt_properties_get( producer_props, "resource" );
+			QmlParser *parser = new QmlParser();
+			parser->loadFile(resource);
+			parser->writeQml();
+            renderer = new QmlRenderer(resource, fps, anim_duration);
 
 			mlt_properties_set_data( producer_props, "qrenderer", renderer, 0, ( mlt_destructor )qrenderer_delete, NULL );
 

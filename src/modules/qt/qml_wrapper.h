@@ -1,6 +1,8 @@
 /*
  * qml_wrapper.h -- kdenlivetitle wrapper
  * Copyright (c) 2019 Akhil K Gangadharan <helloimakhil@gmail.com>
+ * Author: Akhil K Gangadharan based on the code of producer_kdenlivetitle by
+ * Marco Gittler and Jean-Baptiste Mardelle
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -48,7 +50,7 @@ extern void renderKdenliveTitle(producer_ktitle_qml self, mlt_frame frame,
                                     mlt_image_format format, int, int, mlt_position,
                                     int);
 extern void loadFromQml(producer_ktitle_qml self);
-extern int getMaxDuration(QObject* root, int duration = 0);
+extern void traverseQml(QObject* root, mlt_properties properties, mlt_profile profile);
 
 #ifdef __cplusplus
 }

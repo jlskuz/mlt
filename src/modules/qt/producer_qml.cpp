@@ -1,6 +1,8 @@
 /*
  * producer_qml.cpp -- kdenlive QML producer
- * Copyright (c) 2019 Akhil K Gangadharan <akhilam512@gmail.com>
+ * Copyright (c) 2019 Akhil K Gangadharan <helloimakhil@gmail.com>
+ * Author: Akhil K Gangadharan based on the code of producer_kdenlivetitle by
+ * Marco Gittler and Jean-Baptiste Mardelle
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -37,18 +39,17 @@ void read_qml(mlt_properties properties, mlt_profile profile)
       std::ifstream resource_stream;
       resource_stream.open(resource);
 
-      if (!resource_stream)
-      {
-            throw std::runtime_error(
-                "Input QML file was not read - Resource stream error");
+      if (!resource_stream) {
+            qDebug() << "Input QML file was not read - Resource stream error";
+            return;
       }
 
       std::string str((std::istreambuf_iterator<char>(resource_stream)),
                       std::istreambuf_iterator<char>());
       const char *infile = str.c_str();
+
       mlt_properties_set(properties, "_qmldata", infile);
       resource_stream.close();
-
 
 	QQmlEngine qml_engine;
 	QQmlComponent qml_component(&qml_engine, resource, QQmlComponent::PreferSynchronous);
@@ -61,14 +62,7 @@ void read_qml(mlt_properties properties, mlt_profile profile)
 	}
 
       QObject *rootObject = qml_component.create();
-
-      int fps = mlt_profile_fps(profile);
-	int duration = getMaxDuration(rootObject);
-      int length = duration*fps;
-	mlt_properties_set_position(properties, "length", length);
-      mlt_properties_set_position(properties, "duration", duration);
-      mlt_properties_set_position(properties, "kdenlive:duration", length);
-      mlt_properties_set_position(properties, "out", length - 1);
+	traverseQml(rootObject, properties, profile);
 }
 
 static void producer_close(mlt_producer producer)
@@ -225,7 +219,7 @@ extern "C"
                   mlt_properties_set_int(properties, "seekable", 1);
                   return producer;
             }
-	    free(self);
+	      free(self);
             return NULL;
       }
 }
