@@ -62,6 +62,7 @@ void read_qml(mlt_properties properties, mlt_profile profile)
 	}
 
       QObject *rootObject = qml_component.create();
+      mlt_properties_set_position(properties, "duration", 0);
 	traverseQml(rootObject, properties, profile);
 }
 
@@ -114,6 +115,9 @@ static int producer_get_image(mlt_frame frame, uint8_t **buffer,
                                 mlt_frame_original_position(frame), 0);
       }
 
+	// Get width and height (may have changed during the refresh)
+	*width = mlt_properties_get_int( properties, "width" );
+	*height = mlt_properties_get_int( properties, "height" );
       *format = self->format;
       if (self->current_image)
       {

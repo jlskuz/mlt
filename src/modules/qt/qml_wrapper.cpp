@@ -20,7 +20,6 @@
  */
 
 #include "qml_wrapper.h"
-#include "qmlparser.h"
 #include "common.h"
 #include <framework/mlt_log.h>
 #include <QString>
@@ -86,7 +85,6 @@ public:
     explicit QmlCoreRenderer(QObject *parent = nullptr)
 	: QObject(parent)
 	, m_fbo(nullptr)
-	, m_animationDriver(nullptr)
 	, m_offscreenSurface(nullptr)
 	, m_context(nullptr)
 	, m_quickWindow(nullptr)
@@ -101,7 +99,6 @@ public:
     void setSurface(QOffscreenSurface *surface) { m_offscreenSurface = surface; }
     void setQuickWindow(QQuickWindow *window) { m_quickWindow = window; }
     void setRenderControl(QQuickRenderControl* control) { m_renderControl = control; }
-    void setAnimationDriver(QmlAnimationDriver* driver) { m_animationDriver = driver; }
     void setSize(QSize s) { m_size = s; }
     void setDPR(qreal value) { m_dpr = value; }
     void setFPS(int value) { m_fps = value;}
@@ -200,7 +197,6 @@ private:
     QQuickRenderControl* m_renderControl;
     QQuickWindow* m_quickWindow;
     QOpenGLFramebufferObject* m_fbo;
-    QmlAnimationDriver* m_animationDriver;
     QImage::Format m_format;
     QSize m_size;
     qreal m_dpr;
@@ -212,7 +208,6 @@ private:
 
 class QmlRenderer: public QObject
 {
-	// Since we make use of signals and slots of our own we need Qt's moc compilation
     Q_OBJECT
 
 public:
@@ -358,29 +353,8 @@ protected:
 private:
     void initDriver()
 	{
-		/*
-		We use a corrected FPS because animations take more frames than expected due to a weird behaviour of the custom QAnimation Driver. For different timesteps the animations lag by a certain amount of frames, values for which were investigated for different values of fps's. The cause of this bug remains unknown for the time being but it is probably an upstream one.
-		*/
-
-		int correctedFps = m_fps;
-		if (m_fps < 40) {
-			correctedFps -= 1;
-		}
-		else if (m_fps <= 60) {
-			correctedFps -= 2;
-		}
-		else if (m_fps <= 69) {
-			correctedFps -= 3;
-		}
-		else if (m_fps <= 80) {
-			correctedFps -= 4;
-		}
-		else {
-			correctedFps -= 5;
-		}
-		m_animationDriver = new QmlAnimationDriver(1000 / correctedFps);
+		m_animationDriver = new QmlAnimationDriver(1000 / m_fps);
 		m_animationDriver->install();
-		m_corerenderer->setAnimationDriver(m_animationDriver);
 	}
 
     void resetDriver()
@@ -573,9 +547,7 @@ void traverseQml(QObject *root, mlt_properties properties, mlt_profile profile)
 		bool enabled = getMetaPropValue(root, "enabled", 6).toBool();
 		// Only one timeline should be enabled at a time
 		if(enabled) {
-			qreal anim_duration = getMetaPropValue(root, "endFrame", 2).toReal();
-			int length = (anim_duration/1000) * mlt_profile_fps(profile);
-
+			int length = getMetaPropValue(root, "endFrame", 2).toInt();
 			mlt_properties_set_position(properties, "length", length);
 			mlt_properties_set_position(properties, "kdenlive:duration", length);
 			mlt_properties_set_position(properties, "out", length - 1);
@@ -657,9 +629,6 @@ void renderKdenliveTitle(producer_ktitle_qml self, mlt_frame frame,
 				return;
 			}
 			char* resource = mlt_properties_get( producer_props, "resource" );
-			QmlParser *parser = new QmlParser();
-			parser->loadFile(resource);
-			parser->writeQml();
             renderer = new QmlRenderer(resource, fps, anim_duration);
 
 			mlt_properties_set_data( producer_props, "qrenderer", renderer, 0, ( mlt_destructor )qrenderer_delete, NULL );
