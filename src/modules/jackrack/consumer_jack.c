@@ -1,6 +1,6 @@
 /*
  * consumer_jack.c -- a JACK audio consumer
- * Copyright (C) 2011-2014 Meltytech, LLC
+ * Copyright (C) 2011-2021 Meltytech, LLC
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -64,7 +64,7 @@ static int consumer_stop( mlt_consumer parent );
 static int consumer_is_stopped( mlt_consumer parent );
 static void consumer_close( mlt_consumer parent );
 static void *consumer_thread( void * );
-static void consumer_refresh_cb( mlt_consumer sdl, mlt_consumer parent, char *name );
+static void consumer_refresh_cb(mlt_consumer sdl, mlt_consumer parent, mlt_event_data );
 static int jack_process( jack_nframes_t frames, void * data );
 
 /** Constructor
@@ -140,8 +140,9 @@ mlt_consumer consumer_jack_init( mlt_profile profile, mlt_service_type type, con
 	return NULL;
 }
 
-static void consumer_refresh_cb( mlt_consumer sdl, mlt_consumer parent, char *name )
+static void consumer_refresh_cb( mlt_consumer sdl, mlt_consumer parent, mlt_event_data event_data )
 {
+	const char *name = mlt_event_data_to_string(event_data);
 	if ( !strcmp( name, "refresh" ) )
 	{
 		consumer_jack self = parent->child;
@@ -310,7 +311,7 @@ static int consumer_play_audio( consumer_jack self, mlt_frame frame, int init_au
 	int channels = mlt_properties_get_int( properties, "channels" );
 	int frequency = mlt_properties_get_int( properties, "frequency" );
 	int scrub = mlt_properties_get_int( properties, "scrub_audio" );
-	int samples = mlt_sample_calculator( mlt_properties_get_double( properties, "fps" ), frequency, self->counter++ );
+	int samples = mlt_audio_calculate_frame_samples( mlt_properties_get_double( properties, "fps" ), frequency, self->counter++ );
 	float *buffer;
 
 	mlt_frame_get_audio( frame, (void**) &buffer, &afmt, &frequency, &channels, &samples );
@@ -362,8 +363,9 @@ static int consumer_play_video( consumer_jack self, mlt_frame frame )
 {
 	// Get the properties of this consumer
 	mlt_properties properties = MLT_CONSUMER_PROPERTIES( &self->parent );
-	if ( self->running && !mlt_consumer_is_stopped( &self->parent ) )
-		mlt_events_fire( properties, "consumer-frame-show", frame, NULL );
+	if ( self->running && !mlt_consumer_is_stopped( &self->parent ) ) {
+		mlt_events_fire( properties, "consumer-frame-show", mlt_event_data_from_frame(frame) );
+	}
 
 	return 0;
 }
@@ -532,7 +534,7 @@ static void *consumer_thread( void *arg )
 			while ( self->running && speed != 0 && mlt_deque_count( self->queue ) > 15 )
 				nanosleep( &tm, NULL );
 
-			// Push this frame to the back of the queue
+			// Push this frame to the back of the video queue
 			if ( self->running && speed )
 			{
 				pthread_mutex_lock( &self->video_mutex );
@@ -569,7 +571,7 @@ static void *consumer_thread( void *arg )
 //					mlt_consumer_purge( consumer );
 //				last_position = mlt_frame_get_position( frame );
 			}
-			else
+			else if (speed == 0.0)
 			{
 				mlt_consumer_purge( consumer );
 //				last_position = -1;

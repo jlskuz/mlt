@@ -4,7 +4,6 @@ identifier: timewarp
 title: Time Warp
 version: 1
 copyright: Meltytech, LLC
-creator: Brian Matherly
 license: LGPLv2.1
 language: en
 tags:
@@ -51,6 +50,14 @@ parameters:
     readonly: no
     required: yes
     mutable: no
+
+  - identifier: warp_pitch
+    title: Pitch Compensation
+    type: boolean
+    description: Enable or disable pitch compensation
+    readonly: no
+    mutable: no
+    default: 0
 
   - identifier: warp_speed
     title: Warp Speed

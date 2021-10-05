@@ -1,6 +1,6 @@
 /*
  * consumer_sdl2_audio.c -- A Simple DirectMedia Layer audio-only consumer
- * Copyright (C) 2009-2019 Meltytech, LLC
+ * Copyright (C) 2009-2021 Meltytech, LLC
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -75,7 +75,7 @@ static int consumer_is_stopped( mlt_consumer parent );
 static void consumer_purge( mlt_consumer parent );
 static void consumer_close( mlt_consumer parent );
 static void *consumer_thread( void * );
-static void consumer_refresh_cb( mlt_consumer sdl, mlt_consumer self, char *name );
+static void consumer_refresh_cb(mlt_consumer sdl, mlt_consumer self, mlt_event_data );
 
 /** This is what will be called by the factory - anything can be passed in
 	via the argument, but keep it simple.
@@ -147,9 +147,10 @@ mlt_consumer consumer_sdl2_audio_init( mlt_profile profile, mlt_service_type typ
 	return NULL;
 }
 
-static void consumer_refresh_cb( mlt_consumer sdl, mlt_consumer parent, char *name )
+static void consumer_refresh_cb( mlt_consumer sdl, mlt_consumer parent, mlt_event_data event_data )
 {
-	if ( !strcmp( name, "refresh" ) )
+	const char *name = mlt_event_data_to_string(event_data);
+	if ( name && !strcmp( name, "refresh" ) )
 	{
 		consumer_sdl self = parent->child;
 		pthread_mutex_lock( &self->refresh_mutex );
@@ -299,7 +300,7 @@ static void sdl_fill_audio( void *udata, uint8_t *stream, int len )
 	pthread_mutex_unlock( &self->audio_mutex );
 }
 
-static int consumer_play_audio( consumer_sdl self, mlt_frame frame, int init_audio, int *duration )
+static int consumer_play_audio( consumer_sdl self, mlt_frame frame, int init_audio, int64_t *duration )
 {
 	// Get the properties of self consumer
 	mlt_properties properties = self->properties;
@@ -311,10 +312,10 @@ static int consumer_play_audio( consumer_sdl self, mlt_frame frame, int init_aud
 	int scrub = mlt_properties_get_int( properties, "scrub_audio" );
 	static int counter = 0;
 
-	int samples = mlt_sample_calculator( mlt_properties_get_double( self->properties, "fps" ), frequency, counter++ );
+	int samples = mlt_audio_calculate_frame_samples( mlt_properties_get_double( self->properties, "fps" ), frequency, counter++ );
 	int16_t *pcm;
 	mlt_frame_get_audio( frame, (void**) &pcm, &afmt, &frequency, &channels, &samples );
-	*duration = ( ( samples * 1000 ) / frequency );
+	*duration = 1000000LL * samples / frequency;
 	pcm += mlt_properties_get_int( properties, "audio_offset" );
 
 	if ( mlt_properties_get_int( properties, "audio_off" ) )
@@ -444,7 +445,7 @@ static int consumer_play_video( consumer_sdl self, mlt_frame frame )
 {
 	// Get the properties of this consumer
 	mlt_properties properties = self->properties;
-	mlt_events_fire( properties, "consumer-frame-show", frame, NULL );
+	mlt_events_fire( properties, "consumer-frame-show", mlt_event_data_from_frame(frame) );
 	return 0;
 }
 
@@ -500,8 +501,8 @@ static void *video_thread( void *arg )
 		// See if we have to delay the display of the current frame
 		if ( mlt_properties_get_int( properties, "rendered" ) == 1 )
 		{
-			// Obtain the scheduled playout time
-			int64_t scheduled = mlt_properties_get_int( properties, "playtime" );
+			// Obtain the scheduled playout time in microseconds
+			int64_t scheduled = mlt_properties_get_int64( properties, "playtime" );
 
 			// Determine the difference between the elapsed time and the scheduled playout time
 			int64_t difference = scheduled - elapsed;
@@ -510,7 +511,7 @@ static void *video_thread( void *arg )
 			if ( real_time && ( difference > 20000 && speed == 1.0 ) )
 			{
 				tm.tv_sec = difference / 1000000;
-				tm.tv_nsec = ( difference % 1000000 ) * 500;
+				tm.tv_nsec = ( difference % 1000000 ) * 1000;
 				nanosleep( &tm, NULL );
 			}
 
@@ -523,6 +524,7 @@ static void *video_thread( void *arg )
 			{
 				gettimeofday( &now, NULL );
 				start = ( ( int64_t )now.tv_sec * 1000000 + now.tv_usec ) - scheduled + 20000;
+				start += mlt_properties_get_int(self->properties, "video_delay") * 1000;
 			}
 		}
 
@@ -573,8 +575,8 @@ static void *consumer_thread( void *arg )
 	int init_video = 1;
 	mlt_frame frame = NULL;
 	mlt_properties properties = NULL;
-	int duration = 0;
-	int64_t playtime = 0;
+	int64_t duration = 0;
+	int64_t playtime = mlt_properties_get_int(consumer_props, "video_delay") * 1000;
 	struct timespec tm = { 0, 100000 };
 //	int last_position = -1;
 
@@ -615,8 +617,8 @@ static void *consumer_thread( void *arg )
 				init_video = 0;
 			}
 
-			// Set playtime for this frame
-			mlt_properties_set_int( properties, "playtime", playtime );
+			// Set playtime for this frame in microseconds
+			mlt_properties_set_int64( properties, "playtime", playtime );
 
 			while ( self->running && speed != 0 && mlt_deque_count( self->queue ) > 15 )
 				nanosleep( &tm, NULL );
@@ -639,7 +641,7 @@ static void *consumer_thread( void *arg )
 				pthread_mutex_unlock( &self->video_mutex );
 
 				// Calculate the next playtime
-				playtime += ( duration * 1000 );
+				playtime += duration;
 			}
 			else if ( self->running )
 			{
@@ -663,10 +665,9 @@ static void *consumer_thread( void *arg )
 //					mlt_consumer_purge( consumer );
 //				last_position = mlt_frame_get_position( frame );
 			}
-			else
+			else if (speed == 0.0)
 			{
 				mlt_consumer_purge( consumer );
-//				last_position = -1;
 			}
 		}
 	}

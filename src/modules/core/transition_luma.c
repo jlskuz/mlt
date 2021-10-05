@@ -1,6 +1,6 @@
 /*
  * transition_luma.c -- a generic dissolve/wipe processor
- * Copyright (C) 2003-2019 Meltytech, LLC
+ * Copyright (C) 2003-2020 Meltytech, LLC
  *
  * Adapted from Kino Plugin Timfx, which is
  * Copyright (C) 2002 Timothy M. Shead <tshead@k-3d.com>
@@ -118,9 +118,9 @@ static inline int dissolve_yuv( mlt_frame frame, mlt_frame that, float weight, i
 	if ( mlt_properties_get( &frame->parent, "distort" ) )
 		mlt_properties_set( &that->parent, "distort", mlt_properties_get( &frame->parent, "distort" ) );
 	mlt_frame_get_image( frame, &p_dest, &format, &width, &height, 1 );
-	alpha_dst = mlt_frame_get_alpha_mask( frame );
+	alpha_dst = mlt_frame_get_alpha( frame );
 	mlt_frame_get_image( that, &p_src, &format, &width_src, &height_src, 0 );
-	alpha_src = mlt_frame_get_alpha_mask( that );
+	alpha_src = mlt_frame_get_alpha( that );
 	int is_translucent = ( alpha_dst && !is_opaque(alpha_dst, width, height) )
 	                  || ( alpha_src && !is_opaque(alpha_src, width_src, height_src) );
 
@@ -148,8 +148,8 @@ static inline int dissolve_yuv( mlt_frame frame, mlt_frame that, float weight, i
 			composite_line_yuv( p_dest, p_src, width_src, alpha_src, alpha_dst, mix, NULL, 0, 0 );
 			p_src += width_src << 1;
 			p_dest += width << 1;
-			alpha_src += width_src;
-			alpha_dst += width;
+			if ( alpha_src ) alpha_src += width_src;
+			if ( alpha_dst ) alpha_dst += width;
 		}
 	}
 
@@ -205,9 +205,9 @@ static void luma_composite( mlt_frame a_frame, mlt_frame b_frame, int luma_width
 	if ( mlt_properties_get( &a_frame->parent, "distort" ) )
 		mlt_properties_set( &b_frame->parent, "distort", mlt_properties_get( &a_frame->parent, "distort" ) );
 	mlt_frame_get_image( a_frame, &p_dest, &format_dest, &width_dest, &height_dest, 1 );
-	alpha_dest = mlt_frame_get_alpha_mask( a_frame );
+	alpha_dest = mlt_frame_get_alpha( a_frame );
 	mlt_frame_get_image( b_frame, &p_src, &format_src, &width_src, &height_src, 0 );
-	alpha_src = mlt_frame_get_alpha_mask( b_frame );
+	alpha_src = mlt_frame_get_alpha( b_frame );
 
 	if ( *width == 0 || *height == 0 )
 		return;
@@ -308,6 +308,25 @@ static void luma_composite( mlt_frame a_frame, mlt_frame b_frame, int luma_width
 	}
 }
 
+void yuv422_to_luma16(uint8_t *image, uint16_t **map, int width, int height, int full_range)
+{
+	// allocate the luma bitmap
+	*map = (uint16_t*) mlt_pool_alloc(width * height * sizeof(uint16_t));
+	if (!*map)
+		return;
+
+	int i;
+	int n = width * height;
+	uint8_t offset = full_range? 0 : 16;
+	uint8_t max = full_range? 255 : 235 - offset;
+	int factor = full_range? 256 : 299; // 299 = 65535 / 219
+
+	// process the image data into the luma bitmap
+	for (i = 0; i < n; i++) {
+		(*map)[i] = CLAMP(image[i << 1] - offset, 0, max) * factor;
+	}
+}
+
 static int transition_get_image( mlt_frame a_frame, uint8_t **image, mlt_image_format *format, int *width, int *height, int writable )
 {
 	// Get the b frame from the stack
@@ -335,6 +354,7 @@ static int transition_get_image( mlt_frame a_frame, uint8_t **image, mlt_image_f
 	int luma_height = mlt_properties_get_int( properties, "height" );
 	uint16_t *luma_bitmap = mlt_properties_get_data( properties, "bitmap", NULL );
 	char *current_resource = mlt_properties_get( properties, "_resource" );
+	mlt_producer producer = mlt_properties_get_data(properties, "producer", NULL);
 	
 	// If the filename property changed, reload the map
 	char *resource = mlt_properties_get( properties, "resource" );
@@ -346,7 +366,7 @@ static int transition_get_image( mlt_frame a_frame, uint8_t **image, mlt_image_f
 		luma_height = *height;
 	}
 		
-	if ( resource && ( !current_resource || strcmp( resource, current_resource ) ) )
+	if ( resource && ( producer || !current_resource || strcmp( resource, current_resource ) ) )
 	{
 		char temp[ 512 ];
 		char *extension = strrchr( resource, '.' );
@@ -391,23 +411,29 @@ static int transition_get_image( mlt_frame a_frame, uint8_t **image, mlt_image_f
 			mlt_properties_set_int( properties, "height", luma_height );
 			mlt_properties_set( properties, "_resource", orig_resource );
 			mlt_properties_set_data( properties, "bitmap", luma_bitmap, luma_width * luma_height * 2, mlt_pool_release, NULL );
+			mlt_properties_clear(properties, "producer");
 		}
 		else if (!*resource) 
 		{
 		    luma_bitmap = NULL;
 		    mlt_properties_set( properties, "_resource", NULL );
 		    mlt_properties_set_data( properties, "bitmap", luma_bitmap, 0, mlt_pool_release, NULL );
+			mlt_properties_clear(properties, "producer");
 		}
 		else
 		{
-			// Get the factory producer service
-			char *factory = mlt_properties_get( properties, "factory" );
-
-			// Create the producer
-			mlt_producer producer = mlt_factory_producer( profile, factory, resource );
+			if (!producer || !current_resource || strcmp(resource, current_resource)) {
+				// Get the factory producer service
+				char *factory = mlt_properties_get( properties, "factory" );
+	
+				// Create the producer
+				producer = mlt_factory_producer( profile, factory, resource );
+				if (producer)
+					mlt_properties_set(properties, "_resource", resource);
+			}
 
 			// If we have one
-			if ( producer != NULL )
+			if (producer)
 			{
 				// Get the producer properties
 				mlt_properties producer_properties = MLT_PRODUCER_PROPERTIES( producer );
@@ -421,6 +447,17 @@ static int transition_get_image( mlt_frame a_frame, uint8_t **image, mlt_image_f
 				// We will get the alpha frame from the producer
 				mlt_frame luma_frame = NULL;
 
+				// Determine if producer is a video clip or still image
+				const char* service_name = mlt_properties_get(producer_properties, "mlt_service");
+				int is_clip = mlt_producer_get_length(producer) > 1 &&
+						mlt_properties_get_int(producer_properties, "video_index") >= 0 &&
+						service_name && !strncmp("avformat", service_name, 8);
+				if (is_clip) {
+					if (!mlt_properties_get(producer_properties, "producer.eof"))
+						mlt_properties_set(producer_properties, "eof", "pause");
+					mlt_producer_seek(producer, mlt_transition_get_position(transition, a_frame));
+				}
+
 				// Get the luma frame
 				if ( mlt_service_get_frame( MLT_PRODUCER_SERVICE( producer ), &luma_frame, 0 ) == 0 )
 				{
@@ -428,25 +465,35 @@ static int transition_get_image( mlt_frame a_frame, uint8_t **image, mlt_image_f
 					mlt_image_format luma_format = mlt_image_yuv422;
 
 					// Get image from the luma producer
-					mlt_properties_set( MLT_FRAME_PROPERTIES( luma_frame ), "rescale.interp", "nearest" );
 					mlt_frame_get_image( luma_frame, &luma_image, &luma_format, &luma_width, &luma_height, 0 );
 
 					// Generate the luma map
-					if ( luma_image != NULL )
-						mlt_luma_map_from_yuv422( luma_image, &luma_bitmap, luma_width, luma_height );
+					if (luma_image) {
+						if (is_clip) {
+							yuv422_to_luma16(luma_image, &luma_bitmap, luma_width, luma_height,
+								mlt_properties_get_int(MLT_FRAME_PROPERTIES(luma_frame), "full_luma"));
+						} else {
+							mlt_luma_map_from_yuv422(luma_image, &luma_bitmap, luma_width, luma_height);
+						}
+					}
 					
 					// Set the transition properties
 					mlt_properties_set_int( properties, "width", luma_width );
 					mlt_properties_set_int( properties, "height", luma_height );
-					mlt_properties_set( properties, "_resource", orig_resource);
 					mlt_properties_set_data( properties, "bitmap", luma_bitmap, luma_width * luma_height * 2, mlt_pool_release, NULL );
 
 					// Cleanup the luma frame
 					mlt_frame_close( luma_frame );
 				}
 
-				// Cleanup the luma producer
-				mlt_producer_close( producer );
+				if (is_clip) {
+					// Save the producer for getting next frame
+					mlt_properties_set_data(properties, "producer", producer, 0, (mlt_destructor) mlt_producer_close, NULL);
+				} else {
+					// Cleanup the luma producer
+					mlt_producer_close(producer);
+					producer = NULL;
+				}
 			}
 		}
 	}
@@ -472,7 +519,12 @@ static int transition_get_image( mlt_frame a_frame, uint8_t **image, mlt_image_f
 	if ( mlt_properties_get( properties, "fixed" ) )
 		mix = mlt_properties_get_double( properties, "fixed" );
 
-	mlt_service_unlock( MLT_TRANSITION_SERVICE( transition ) );
+	if (producer) {
+		invert = !invert;
+		mix = 0.5f;
+	} else {
+		mlt_service_unlock( MLT_TRANSITION_SERVICE( transition ) );
+	}
 
 	if ( luma_width > 0 && luma_height > 0 && luma_bitmap != NULL )
 	{
@@ -489,6 +541,9 @@ static int transition_get_image( mlt_frame a_frame, uint8_t **image, mlt_image_f
 		invert = 0;
 		// Dissolve the frames using the time offset for mix value
 		dissolve_yuv( a_frame, b_frame, mix, *width, *height, threads, alpha_over );
+	}
+	if (producer) {
+		mlt_service_unlock( MLT_TRANSITION_SERVICE( transition ) );
 	}
 
 	// Extract the a_frame image info

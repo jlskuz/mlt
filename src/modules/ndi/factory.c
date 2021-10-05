@@ -40,6 +40,8 @@ void swab2( const void *from, void *to, int n )
 {
 #if defined(USE_SSE)
 #define SWAB_STEP 16
+	int cnt = n / SWAB_STEP;
+
 	__asm__ volatile
 	(
 		"loop_start:                            \n\t"
@@ -67,9 +69,9 @@ void swab2( const void *from, void *to, int n )
 		"dec            %[cnt]                  \n\t"
 		"jnz            loop_start              \n\t"
 
+		: [from]"+r"(from), [to]"+r"(to), [cnt]"+r"(cnt)
 		:
-		: [from]"r"(from), [to]"r"(to), [cnt]"r"(n / SWAB_STEP)
-		//: "xmm0", "xmm1"
+		: "xmm0", "xmm1"
 	);
 
 	from = (unsigned char*) from + n - (n % SWAB_STEP);
@@ -108,9 +110,9 @@ static void *create_service( mlt_profile profile, mlt_service_type type, const c
 		return NULL;
 	}
 
-	if ( type == producer_type )
+	if ( type == mlt_service_producer_type )
 		return producer_ndi_init( profile, type, id, (char*)arg );
-	else if ( type == consumer_type )
+	else if ( type == mlt_service_consumer_type )
 		return consumer_ndi_init( profile, type, id, (char*)arg );
 
 	return NULL;
@@ -118,6 +120,6 @@ static void *create_service( mlt_profile profile, mlt_service_type type, const c
 
 MLT_REPOSITORY
 {
-	MLT_REGISTER( consumer_type, "ndi", create_service );
-	MLT_REGISTER( producer_type, "ndi", create_service );
+	MLT_REGISTER( mlt_service_consumer_type, "ndi", create_service );
+	MLT_REGISTER( mlt_service_producer_type, "ndi", create_service );
 }

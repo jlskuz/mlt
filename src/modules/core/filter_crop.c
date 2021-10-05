@@ -1,6 +1,6 @@
 /*
  * filter_crop.c -- cropping filter
- * Copyright (C) 2009-2014 Meltytech, LLC
+ * Copyright (C) 2009-2021 Meltytech, LLC
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -86,9 +86,9 @@ static int filter_get_image( mlt_frame frame, uint8_t **image, mlt_image_format 
 		int bpp;
 
 		// Subsampled YUV is messy and less precise.
-		if ( *format == mlt_image_yuv422 && frame->convert_image && ( left & 1 ) )
+		if (*format == mlt_image_yuv422 && frame->convert_image && (left & 1 || right & 1))
 		{
-			mlt_image_format requested_format = mlt_image_rgb24;
+			mlt_image_format requested_format = mlt_image_rgb;
 			frame->convert_image( frame, image, format, requested_format );
 		}
 	
@@ -170,24 +170,24 @@ static mlt_frame filter_process( mlt_filter filter, mlt_frame frame )
 			double input_ar = aspect_ratio * width / height;
 			double output_ar = mlt_profile_dar( mlt_service_profile( MLT_FILTER_SERVICE(filter) ) );
 			int bias = mlt_properties_get_int( filter_props, "center_bias" );
-			
+
 			if ( input_ar > output_ar )
 			{
 				left = right = ( width - rint( output_ar * height / aspect_ratio ) ) / 2;
+				if ( use_profile )
+					bias = bias * width / profile->width;
 				if ( abs(bias) > left )
 					bias = bias < 0 ? -left : left;
-				else if ( use_profile )
-					bias = bias * width / profile->width;
 				left -= bias;
 				right += bias;
 			}
 			else
 			{
 				top = bottom = ( height - rint( aspect_ratio * width / output_ar ) ) / 2;
+				if ( use_profile )
+					bias = bias * height / profile->height;
 				if ( abs(bias) > top )
 					bias = bias < 0 ? -top : top;
-				else if ( use_profile )
-					bias = bias * height / profile->height;
 				top -= bias;
 				bottom += bias;
 			}

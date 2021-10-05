@@ -1,17 +1,34 @@
-file(GLOB mltdecklink_src *.cpp)
+add_library(mltdecklink MODULE
+  common.cpp
+  consumer_decklink.cpp
+  producer_decklink.cpp
+)
+target_compile_options(mltdecklink PRIVATE ${MLT_COMPILE_OPTIONS})
+
+target_link_libraries(mltdecklink PRIVATE mlt Threads::Threads)
+
 if(WIN32)
-    list(APPEND mltdecklink_src win/DeckLinkAPI_i.cpp)
-    set(mltdecklink_inc ${CMAKE_CURRENT_SOURCE_DIR}/win)
+  target_sources(mltdecklink PRIVATE win/DeckLinkAPI_i.cpp)
+  target_include_directories(mltdecklink PRIVATE win)
 elseif(APPLE)
-    list(APPEND mltdecklink_src darwin/DeckLinkAPIDispatch.cpp)
-    set(mltdecklink_inc ${CMAKE_CURRENT_SOURCE_DIR}/darwin)
+  target_sources(mltdecklink PRIVATE darwin/DeckLinkAPIDispatch.cpp)
+  target_include_directories(mltdecklink PRIVATE darwin)
+  target_link_libraries(mltdecklink PRIVATE "-framework CoreFoundation")
 else()
-    list(APPEND mltdecklink_src linux/DeckLinkAPIDispatch.cpp)
-    set(mltdecklink_inc ${CMAKE_CURRENT_SOURCE_DIR}/linux)
+  target_sources(mltdecklink PRIVATE linux/DeckLinkAPIDispatch.cpp)
+  target_include_directories(mltdecklink PRIVATE linux)
 endif()
-add_library(mltdecklink MODULE ${mltdecklink_src})
-target_link_libraries(mltdecklink mlt Threads::Threads)
-target_include_directories(mltdecklink PRIVATE ${mltdecklink_inc})
-install(TARGETS mltdecklink LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/mlt)
-file(GLOB yml *.yml)
-install(FILES ${yml} DESTINATION ${CMAKE_INSTALL_DATADIR}/mlt/decklink)
+
+if(CPU_SSE)
+  target_compile_definitions(mltdecklink PRIVATE USE_SSE)
+endif()
+
+set_target_properties(mltdecklink PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${MLT_MODULE_OUTPUT_DIRECTORY}")
+
+install(TARGETS mltdecklink LIBRARY DESTINATION ${MLT_INSTALL_MODULE_DIR})
+
+install(FILES
+  consumer_decklink.yml
+  producer_decklink.yml
+  DESTINATION ${MLT_INSTALL_DATA_DIR}/decklink
+)

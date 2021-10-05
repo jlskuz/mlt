@@ -1,6 +1,6 @@
 /*
  * producer_consumer.c -- produce as a consumer of an encapsulated producer
- * Copyright (C) 2008-2014 Meltytech, LLC
+ * Copyright (C) 2008-2021 Meltytech, LLC
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -85,7 +85,7 @@ static int get_audio( mlt_frame frame, void **buffer, mlt_audio_format *format, 
 			fps = mlt_producer_get_fps( cx->self );
 			mlt_properties_set_double( MLT_FRAME_PROPERTIES(nested_frame), "producer_consumer_fps", fps );
 		}
-		*samples = mlt_sample_calculator( fps, *frequency, cx->audio_counter++ );
+		*samples = mlt_audio_calculate_frame_samples( fps, *frequency, cx->audio_counter++ );
 		result = mlt_frame_get_audio( nested_frame, buffer, format, frequency, channels, samples );
 		int size = mlt_audio_format_size( *format, *samples, *channels );
 		int16_t *new_buffer = mlt_pool_alloc( size );
@@ -99,13 +99,12 @@ static int get_audio( mlt_frame frame, void **buffer, mlt_audio_format *format, 
 	{
 		// otherwise return no samples
 		*samples = 0;
-		*buffer = NULL;
 	}
 
 	return result;
 }
 
-static void property_changed( mlt_properties owner, mlt_consumer self, char *name )
+static void property_changed( mlt_properties owner, mlt_consumer self, mlt_event_data event_data )
 {
 	mlt_properties properties = MLT_PRODUCER_PROPERTIES(self);
 	context cx = mlt_properties_get_data( properties, "context", NULL );
@@ -113,11 +112,12 @@ static void property_changed( mlt_properties owner, mlt_consumer self, char *nam
 	if ( !cx )
 		return;
 
-	if ( name == strstr( name, CONSUMER_PROPERTIES_PREFIX ) )
+	const char *name = mlt_event_data_to_string(event_data);
+	if ( name && name == strstr( name, CONSUMER_PROPERTIES_PREFIX ) )
 		mlt_properties_set(MLT_CONSUMER_PROPERTIES( cx->consumer ), name + strlen( CONSUMER_PROPERTIES_PREFIX ),
 			mlt_properties_get( properties, name ));
 
-	if ( name == strstr( name, PRODUCER_PROPERTIES_PREFIX ) )
+	if ( name && name == strstr( name, PRODUCER_PROPERTIES_PREFIX ) )
 		mlt_properties_set(MLT_PRODUCER_PROPERTIES( cx->producer ), name + strlen( PRODUCER_PROPERTIES_PREFIX ),
 			mlt_properties_get( properties, name ));
 }

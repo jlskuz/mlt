@@ -1,6 +1,6 @@
 /*
  * filter_lift_gamma_gain.cpp
- * Copyright (C) 2014 Brian Matherly <pez4brian@yahoo.com>
+ * Copyright (C) 2014 Meltytech, LLC
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -88,9 +88,9 @@ static void refresh_lut( mlt_filter filter, mlt_frame frame )
 			b = CLAMP( b, 0.0, 1.0 );
 
 			// Update LUT
-			self->rlut[ i ] = (int)(r * 255.0);
-			self->glut[ i ] = (int)(g * 255.0);
-			self->blut[ i ] = (int)(b * 255.0);
+			self->rlut[ i ] = lrint(r * 255.0);
+			self->glut[ i ] = lrint(g * 255.0);
+			self->blut[ i ] = lrint(b * 255.0);
 		}
 
 		// Store the values that created the LUT so that
@@ -125,7 +125,7 @@ static void apply_lut( mlt_filter filter, uint8_t* image, mlt_image_format forma
 
 	switch( format )
 	{
-	case mlt_image_rgb24:
+	case mlt_image_rgb:
 		while( --total )
 		{
 			*sample = rlut[ *sample ];
@@ -136,7 +136,7 @@ static void apply_lut( mlt_filter filter, uint8_t* image, mlt_image_format forma
 			sample++;
 		}
 		break;
-	case mlt_image_rgb24a:
+	case mlt_image_rgba:
 		while( --total )
 		{
 			*sample = rlut[ *sample ];
@@ -169,9 +169,9 @@ static int filter_get_image( mlt_frame frame, uint8_t **image, mlt_image_format 
 	mlt_service_unlock( MLT_FILTER_SERVICE( filter ) );
 
 	// Make sure the format is acceptable
-	if( *format != mlt_image_rgb24 && *format != mlt_image_rgb24a )
+	if( *format != mlt_image_rgb && *format != mlt_image_rgba )
 	{
-		*format = mlt_image_rgb24;
+		*format = mlt_image_rgb;
 	}
 
 	// Get the image

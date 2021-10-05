@@ -1,7 +1,6 @@
 /*
  * filter_audiowaveform.cpp -- audio waveform visualization filter
- * Copyright (c) 2015-2020 Meltytech, LLC
- * Author: Brian Matherly <code@brianmatherly.com>
+ * Copyright (c) 2015-2021 Meltytech, LLC
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -69,9 +68,10 @@ static void destory_save_buffer( void* ptr )
 	free( buff );
 }
 
-static void property_changed( mlt_service owner, mlt_filter filter, char *name )
+static void property_changed( mlt_service owner, mlt_filter filter, mlt_event_data event_data )
 {
-	if ( !strcmp( name, "window" ) )
+	const char *name = mlt_event_data_to_string(event_data);
+	if ( name && !strcmp( name, "window" ) )
 	{
 		private_data* pdata = (private_data*)filter->child;
 		pdata->reset_window = 1;
@@ -105,7 +105,7 @@ static int filter_get_audio( mlt_frame frame, void** buffer, mlt_audio_format* f
 		mlt_log_info( MLT_FILTER_SERVICE(filter), "Reset window buffer: %d.\n", mlt_properties_get_int( MLT_FILTER_PROPERTIES( filter ), "window" ) );
 		mlt_profile profile = mlt_service_profile( MLT_FILTER_SERVICE( filter ) );
 		double fps = mlt_profile_fps( profile );
-		int frame_samples = mlt_sample_calculator( fps, *frequency, mlt_frame_get_position( frame ) );
+		int frame_samples = mlt_audio_calculate_frame_samples( fps, *frequency, mlt_frame_get_position( frame ) );
 		int window_ms = mlt_properties_get_int( MLT_FILTER_PROPERTIES( filter ), "window" );
 		pdata->window_frequency = *frequency;
 		pdata->window_channels = *channels;
@@ -256,11 +256,13 @@ static void paint_waveform( QPainter& p, QRectF& rect, int16_t* audio, int sampl
 	}
 }
 
-static void draw_waveforms( mlt_filter filter, mlt_frame frame, QImage* qimg, int16_t* audio, int channels, int samples )
+static void draw_waveforms( mlt_filter filter, mlt_frame frame, QImage* qimg,
+	int16_t* audio, int channels, int samples, int width, int height )
 {
 	mlt_properties filter_properties = MLT_FILTER_PROPERTIES( filter );
 	mlt_position position = mlt_filter_get_position( filter, frame );
 	mlt_position length = mlt_filter_get_length2( filter, frame );
+	mlt_profile profile = mlt_service_profile(MLT_FILTER_SERVICE(filter));
 	int show_channel = mlt_properties_get_int( filter_properties, "show_channel" );
 	int fill = mlt_properties_get_int( filter_properties, "fill" );
 	mlt_rect rect = mlt_properties_anim_get_rect( filter_properties, "rect", position, length );
@@ -270,10 +272,11 @@ static void draw_waveforms( mlt_filter filter, mlt_frame frame, QImage* qimg, in
 		rect.y *= qimg->height();
 		rect.h *= qimg->height();
 	}
-	double scale = mlt_frame_resolution_scale(frame);
+	double scale = mlt_profile_scale_width(profile, width);
 	rect.x *= scale;
-	rect.y *= scale;
 	rect.w *= scale;
+	scale = mlt_profile_scale_height(profile, height);
+	rect.y *= scale;
 	rect.h *= scale;
 
 	QRectF r( rect.x, rect.y, rect.w, rect.h );
@@ -337,14 +340,14 @@ static int filter_get_image( mlt_frame frame, uint8_t **image, mlt_image_format 
 	if( audio )
 	{
 		// Get the current image
-		*image_format = mlt_image_rgb24a;
+		*image_format = mlt_image_rgba;
 		error = mlt_frame_get_image( frame, image, image_format, width, height, writable );
 
 		// Draw the waveforms
 		if( !error ) {
 			QImage qimg( *width, *height, QImage::Format_ARGB32 );
 			convert_mlt_to_qimage_rgba( *image, &qimg, *width, *height );
-			draw_waveforms( filter, frame, &qimg, audio->buffer, audio->channels, audio->samples );
+			draw_waveforms( filter, frame, &qimg, audio->buffer, audio->channels, audio->samples, *width, *height );
 			convert_qimage_to_mlt_rgba( &qimg, *image, *width, *height );
 		}
 	}
@@ -368,8 +371,7 @@ static mlt_frame filter_process( mlt_filter filter, mlt_frame frame )
 	if( mlt_frame_is_test_card( frame ) ) {
 		// The producer does not generate video. This filter will create an
 		// image on the producer's behalf.
-		mlt_profile profile = mlt_service_profile(
-			MLT_PRODUCER_SERVICE( mlt_frame_get_original_producer( frame ) ) );
+		mlt_profile profile = mlt_service_profile( MLT_FILTER_SERVICE( filter ) );
 		mlt_properties_set_int( frame_properties, "progressive", 1 );
 		mlt_properties_set_double( frame_properties, "aspect_ratio", mlt_profile_sar( profile ) );
 		mlt_properties_set_int( frame_properties, "meta.media.width", profile->width );

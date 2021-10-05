@@ -1,8 +1,8 @@
-schema_version: 0.1
+schema_version: 0.3
 type: transition
 identifier: composite
 title: Composite
-version: 1
+version: 2
 copyright: Meltytech, LLC
 creator: Dan Dennedy
 license: LGPLv2.1
@@ -29,13 +29,13 @@ parameters:
     description: >
       The name of a factory service used as a non-PGM producer loader.
     default: loader
+
   - identifier: geometry
     title: Geometry
-    type: geometry
-    description: > 
-      Key frame specification. This is a ";" delimited form of the deprecated 
-      start, key[n], end properties.
+    type: rect
+    description: A possibly keyframed rectangle
     mutable: yes
+
   - identifier: progressive
     title: Progressive
     description: > 
@@ -45,6 +45,7 @@ parameters:
     maximum: 1
     mutable: yes
     widget: checkbox
+
   - identifier: distort
     title: Allow distorted scaling
     description: >
@@ -56,6 +57,7 @@ parameters:
     maximum: 1
     mutable: yes
     widget: checkbox
+
   - identifier: crop_to_fill
     title: Fill by cropping
     description: >
@@ -67,6 +69,7 @@ parameters:
     maximum: 1
     mutable: yes
     widget: checkbox
+
   - identifier: halign
     title: Horizontal alignment
     description: >
@@ -80,6 +83,7 @@ parameters:
       - right
     mutable: yes
     widget: combo
+
   - identifier: valign
     title: Vertical alignment
     description: >
@@ -93,6 +97,7 @@ parameters:
       - bottom
     mutable: yes
     widget: combo
+
   - identifier: luma
     title: Luma map
     description: >
@@ -100,6 +105,7 @@ parameters:
     type: string
     mutable: yes
     widget: fileopen
+
   - identifier: softness
     title: Softness
     description: >
@@ -109,6 +115,7 @@ parameters:
     minimum: 0.0
     maximum: 1.0
     mutable: yes
+
   - identifier: luma.*
     title: Luma producer
     description: >
@@ -116,27 +123,7 @@ parameters:
       with "luma." is passed to the non-PGM luma producer.
     readonly: no
     mutable: yes
-  - identifier: start
-    title: Start geometry
-    description: >
-      (deprecated) A geometry specification as X/Y:WxH[!][:mix]
-      
-      X, Y, W, H are assumed to pixel units unless they have the suffix '%'.
-      
-      '!' is a shortcut to specify distort.
-      
-      Mix is always a 2 digit percentage, defaults to 100.
-    type: geometry
-    default: "0%/0%:100%x100%"
-    readonly: no
-    mutable: yes
-  - identifier: end
-    title: End geometry
-    description: >
-      (deprecated) X/Y:WxH[:mix] - The end geometry specification (see "start").
-    type: geometry
-    readonly: no
-    mutable: yes
+
   - identifier: sliced_composite
     title: Use sliced compositing
     description: >
@@ -146,12 +133,23 @@ parameters:
     default: 0
     mutable: yes
     widget: checkbox
-  - identifier: key[F]
-    title: Key frame geometry
+
+  - identifier: fill
+    title: Fill geometry
     description: >
-      (deprecated) X/Y:WxH[:mix] - set a key frame for geometry between the in 
-      and out. F is a frame number and can be negative to make it relative to 
-      the out point.
-    type: geometry
-    readonly: no
+      Determines whether the image will be scaled up to fill the geometry.
+      Otherwise, if the B frame image fits within the geometry, it will not
+      be scaled. If 0, and the B frame image exceeds the geometry, then it is
+      scaled down to fit within the geometry.
+    type: boolean
+    default: 1
     mutable: yes
+    widget: checkbox
+    
+  - identifier: invert
+    title: Invert
+    description: Whether to swap the A and B clips
+    type: boolean
+    default: 1
+    mutable: yes
+    widget: checkbox

@@ -1,8 +1,7 @@
 /*
  * consumer_blipflash.c -- a consumer to measure A/V sync from a blip/flash
  *                         source
- * Copyright (C) 2013 Brian Matherly
- * Author: Brian Matherly <pez4brian@yahoo.com>
+ * Copyright (C) 2013 Meltytech, LLC
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -195,7 +194,7 @@ static void detect_flash( mlt_frame frame, mlt_position pos, double fps, avsync_
 	if( stats->flash )
 	{
 		stats->flash_history[1] = stats->flash_history[0];
-		stats->flash_history[0] = mlt_sample_calculator_to_now( fps, SAMPLE_FREQ, pos );
+		stats->flash_history[0] = mlt_audio_calculate_samples_to_position( fps, SAMPLE_FREQ, pos );
 		if( stats->flash_history_count < 2 )
 		{
 			stats->flash_history_count++;
@@ -207,7 +206,7 @@ static void detect_blip( mlt_frame frame, mlt_position pos, double fps, avsync_s
 {
 	int frequency = SAMPLE_FREQ;
 	int channels = 1;
-	int samples = mlt_sample_calculator( fps, frequency, pos );
+	int samples = mlt_audio_calculate_frame_samples( fps, frequency, pos );
 	mlt_audio_format format = mlt_audio_float;
 	float* buffer = NULL;
 	int error = mlt_frame_get_audio( frame, (void**) &buffer, &format, &frequency, &channels, &samples );
@@ -227,7 +226,7 @@ static void detect_blip( mlt_frame frame, mlt_position pos, double fps, avsync_s
 					stats->samples_since_blip = 0;
 
 					stats->blip_history[1] = stats->blip_history[0];
-					stats->blip_history[0] = mlt_sample_calculator_to_now( fps, SAMPLE_FREQ, pos );
+					stats->blip_history[0] = mlt_audio_calculate_samples_to_position( fps, SAMPLE_FREQ, pos );
 					stats->blip_history[0] += i;
 					if( stats->blip_history_count < 2 )
 					{
@@ -387,7 +386,7 @@ static void *consumer_thread( void *arg )
 			report_results( stats, pos );
 
 			// Close the frame
-			mlt_events_fire( properties, "consumer-frame-show", frame, NULL );
+			mlt_events_fire( properties, "consumer-frame-show", mlt_event_data_from_frame(frame) );
 			mlt_frame_close( frame );
 		}
 	}

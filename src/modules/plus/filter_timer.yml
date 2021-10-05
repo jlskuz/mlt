@@ -4,7 +4,6 @@ identifier: timer
 title: Timer
 version: 1
 copyright: Meltytech, LLC
-creator: Brian Matherly
 license: LGPLv2.1
 language: en
 tags:
@@ -22,8 +21,11 @@ parameters:
       - HH:MM:SS.S
       - MM:SS
       - MM:SS.SS
+      - MM:SS.SSS
       - SS
       - SS.S
+      - SS.SS
+      - SS.SSS
     default: SS.SS
     readonly: no
     mutable: yes
@@ -68,6 +70,22 @@ parameters:
     mutable: yes
     widget: text
 
+  - identifier: speed
+    title: Speed
+    type: float
+    description: >
+      Clock speed multiplier. For example, speed 10.0 makes the timer tick 10
+      seconds for each second of playback.
+
+      Scales Duration but does not affect Start or Offset. For example: start
+      5s, duration 30s, offset 7s and speed 10.0 will have the timer start at
+      playback time 00:00:05.000 with value 00:00:07, count 10 seconds per
+      second of playback and stop at playback time 00:00:08.000 with value
+      00:00:37.
+    default: 1.0
+    readonly: no
+    mutable: yes
+
   - identifier: direction
     title: Direction
     type: string
@@ -84,7 +102,7 @@ parameters:
 
   - identifier: geometry
     title: Geometry
-    type: geometry
+    type: rect
     description: A set of X/Y coordinates by which to adjust the text.
     default: 0%/0%:100%x100%:100
 

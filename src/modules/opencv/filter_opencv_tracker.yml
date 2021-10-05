@@ -4,7 +4,7 @@ identifier: opencv.tracker
 title: OpenCV Motion Tracker
 copyright: Jean-Baptiste Mardelle
 creator: Jean-Baptiste Mardelle <jb@kdenlive.org>
-version: 1
+version: 2
 license: LGPLv2.1
 language: en
 url:
@@ -87,7 +87,7 @@ parameters:
     type: integer
     description: >
       Decide which blur method is used.
-      0 for median blur, 1 for gaussian blur.
+      0 for median blur, 1 for gaussian blur, 2 for pixelate, 3 for opaque fill.
     readonly: no
     required: no
     minimum: 0
@@ -116,6 +116,15 @@ parameters:
     required: no
     default: 5
     minimum: 0
+
+  - identifier: modelsfolder
+    title: OpenCV models folder
+    type: string
+    description: >
+      The folder where the tracker models are stored if any
+    mutable: no
+    readonly: no
+    required: no
 
   - identifier: results
     title: Analysis Results

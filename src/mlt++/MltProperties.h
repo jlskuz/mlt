@@ -1,6 +1,6 @@
 /**
  * MltProperties.h - MLT Wrapper
- * Copyright (C) 2004-2019 Meltytech, LLC
+ * Copyright (C) 2004-2021 Meltytech, LLC
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -65,6 +65,7 @@ namespace Mlt
 			void *get_data( const char *name, int &size );
 			void *get_data( const char *name );
 			int set( const char *name, const char *value );
+			int set_string( const char *name, const char *value );
 			int set( const char *name, int value );
 			int set( const char *name, int64_t value );
 			int set( const char *name, double value );
@@ -84,11 +85,7 @@ namespace Mlt
 			void debug( const char *title = "Object", FILE *output = stderr );
 			void load( const char *file );
 			int save( const char *file );
-			#if defined( __APPLE__ ) && GCC_VERSION < 40000
-			Event *listen( const char *id, void *object, void (*)( ... ) );
-			#else
 			Event *listen( const char *id, void *object, mlt_listener );
-			#endif
 			static void delete_event( Event * );
 			Event *setup_wait_for( const char *id );
 			void wait_for( Event *, bool destroy = true );
@@ -100,6 +97,7 @@ namespace Mlt
 			int set_lcnumeric( const char *locale );
 			const char *get_lcnumeric( );
 			void clear( const char *name );
+			bool property_exists( const char *name );
 
 			char *get_time( const char *name, mlt_time_format = mlt_time_smpte_df );
 			char *frames_to_time( int, mlt_time_format = mlt_time_smpte_df );

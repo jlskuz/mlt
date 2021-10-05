@@ -128,7 +128,7 @@ static void setup_pen( QPainter& p, QRect& rect, mlt_properties filter_propertie
 	// Find user specified colors for the gradient
 	while( color_found ) {
 		QString prop_name = QString("color.") + QString::number(colors.size() + 1);
-		if( mlt_properties_get(filter_properties, prop_name.toUtf8().constData() ) ) {
+		if( mlt_properties_exists(filter_properties, prop_name.toUtf8().constData() ) ) {
 			mlt_color mcolor = mlt_properties_get_color( filter_properties, prop_name.toUtf8().constData() );
 			colors.append( QColor( mcolor.r, mcolor.g, mcolor.b, mcolor.a ) );
 		} else {
@@ -200,7 +200,7 @@ static int filter_get_image( mlt_frame frame, uint8_t **image, mlt_image_format 
 	mlt_properties filter_properties = MLT_FILTER_PROPERTIES( filter );
 	mlt_properties frame_properties = MLT_FRAME_PROPERTIES( frame );
 
-	if( mlt_properties_get( frame_properties, pdata->mag_prop_name ) )
+	if( mlt_properties_exists( frame_properties, pdata->mag_prop_name ) )
 	{
 		double mag = mlt_properties_get_double( frame_properties, pdata->mag_prop_name );
 		mlt_position position = mlt_filter_get_position( filter, frame );
@@ -208,7 +208,7 @@ static int filter_get_image( mlt_frame frame, uint8_t **image, mlt_image_format 
 		mlt_rect rect = mlt_properties_anim_get_rect( filter_properties, "rect", position, length );
 
 		// Get the current image
-		*format = mlt_image_rgb24a;
+		*format = mlt_image_rgba;
 		error = mlt_frame_get_image( frame, image, format, width, height, 1 );
 
 		if ( strchr( mlt_properties_get( filter_properties, "rect" ), '%' ) ) {
@@ -216,12 +216,15 @@ static int filter_get_image( mlt_frame frame, uint8_t **image, mlt_image_format 
 			rect.w *= *width;
 			rect.y *= *height;
 			rect.h *= *height;
+		} else {
+			mlt_profile profile = mlt_service_profile(MLT_FILTER_SERVICE(filter));
+			double scale = mlt_profile_scale_width(profile, *width);
+			rect.x *= scale;
+			rect.w *= scale;
+			scale = mlt_profile_scale_height(profile, *height);
+			rect.y *= scale;
+			rect.h *= scale;
 		}
-		double scale = mlt_frame_resolution_scale(frame);
-		rect.x *= scale;
-		rect.y *= scale;
-		rect.w *= scale;
-		rect.h *= scale;
 
 		// Draw the light
 		if( !error ) {

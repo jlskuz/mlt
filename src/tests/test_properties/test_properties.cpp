@@ -218,6 +218,25 @@ private Q_SLOTS:
         QCOMPARE(p.get_time("key", mlt_time_smpte_df), timeString);
     }
 
+    void SetAndGetTimeCode5994Fps()
+    {
+        Profile profile("atsc_720p_5994");
+        Properties p;
+        p.set("_profile", profile.get_profile(), 0);
+        const char *timeString = "00:01:00;04";
+        int frames = 3600;
+        p.set("key", timeString);
+        QCOMPARE(p.get_int("key"), frames);
+        p.set("key", frames);
+        QCOMPARE(p.get_time("key", mlt_time_smpte_df), timeString);
+        timeString = "00:10:00;01";
+        frames = 36001 - 9 * 4;
+        p.set("key", timeString);
+        QCOMPARE(p.get_int("key"), frames);
+        p.set("key", frames);
+        QCOMPARE(p.get_time("key", mlt_time_smpte_df), timeString);
+    }
+
     void SetAndGetTimeCodeNonIntFps()
     {
         Profile profile("atsc_720p_2398");
@@ -314,6 +333,14 @@ private Q_SLOTS:
         p.set("key", "@16.0/9.0 *2 +3 -1");
         QCOMPARE(p.get_int("key"), 5);
         QCOMPARE(p.get_double("key"), 16.0/9.0 *2 +3 -1);
+    }
+
+    void SetMathExpressionWithProperty()
+    {
+        Properties p;
+        p.set("width", 100);
+        p.set("key", "@16.0/9.0 *width");
+        QCOMPARE(p.get_int("key"), 177);
     }
 
     void PassOneProperty()
@@ -892,6 +919,65 @@ private Q_SLOTS:
         QCOMPARE(p.anim_get("key", 45), "hello world");
     }
 
+
+    void PropertyRefreshOnAnimationChange()
+    {
+        // Create an animation property from string and see that it works.
+        // Get the animation and modify the first position.
+        // Ensure that change affects other get() functions
+
+        {
+            Properties p;
+            p.set("foo", "10=100; 20=200");
+            QCOMPARE(p.get_double("foo"), 10.0);
+            // Call anim_get_double() to create the animation
+            QCOMPARE(p.anim_get_double("foo", 15, 20 ), 150.0);
+            Mlt::Animation animation = p.get_animation("foo");
+            animation.key_set_frame(0, 15);
+            QCOMPARE(p.get_double("foo"), 15.0);
+        }
+
+        {
+            Properties p;
+            p.set("foo", "10=100;20=200");
+            QCOMPARE(p.anim_get_double("foo", 15, 20 ), 150.0);
+            Mlt::Animation animation = p.get_animation("foo");
+            animation.key_set_frame(0, 15);
+            QCOMPARE(p.anim_get_double("foo", 15, 0 ), 100.0);
+        }
+
+        {
+            Properties p;
+            p.set("foo", "10=100; 20=200");
+            QCOMPARE(p.get_int("foo"), 10);
+            // Call anim_get_int() to create the animation
+            QCOMPARE(p.anim_get_int("foo", 15, 20 ), 150);
+            Mlt::Animation animation = p.get_animation("foo");
+            animation.key_set_frame(0, 15);
+            QCOMPARE(p.get_int("foo"), 15);
+        }
+
+        {
+            Properties p;
+            p.set("foo", "10=100; 20=200");
+            QCOMPARE(p.anim_get_int("foo", 15, 20 ), 150);
+            Mlt::Animation animation = p.get_animation("foo");
+            animation.key_set_frame(0, 15);
+            QCOMPARE(p.anim_get_int("foo", 15, 0 ), 100);
+        }
+
+        {
+            Properties p;
+            p.set("foo", "10=100;20=200");
+            // Call anim_get_int() to create the animation
+            QCOMPARE(p.anim_get_int("foo", 15, 20 ), 150);
+            Mlt::Animation animation = p.get_animation("foo");
+            QCOMPARE(p.get("foo"), "10=100;20=200");
+            animation.key_set_frame(0, 15);
+            QCOMPARE(p.get("foo"), "15=100;20=200");
+        }
+    }
+
     void test_mlt_rect()
     {
         mlt_property p = mlt_property_init();
@@ -1104,6 +1190,44 @@ private Q_SLOTS:
         QCOMPARE(p.get_data("key"), (void*) 0);
         QCOMPARE(p.get_animation("key"), mlt_animation(0));
         QCOMPARE(p.get_int("key"), 0);
+    }
+
+    void PropertyExists()
+    {
+        Properties p;
+        // Never set should return false
+        QCOMPARE(p.property_exists("key"), false);
+        // Set should return true
+        p.set("key", 1);
+        QCOMPARE(p.property_exists("key"), true);
+        // Cleared should return false
+        p.clear("key");
+        QCOMPARE(p.property_exists("key"), false);
+    }
+
+    void AnimationExists()
+    {
+        Properties p;
+        // Never set should return false
+        QCOMPARE(p.property_exists("key"), false);
+        // Get an animation but don't set anything - should return false
+        Mlt::Animation animation = p.get_animation("key");
+        QCOMPARE(p.property_exists("key"), false);
+        // Set animation should return true
+        p.anim_set("key", 1, 0 );
+        QCOMPARE(p.property_exists("key"), true);
+        // Cleared should return false
+        p.clear("key");
+        QCOMPARE(p.property_exists("key"), false);
+    }
+
+    void SetString()
+    {
+        Properties p;
+        p.set_string("foo", "123.4");
+        QCOMPARE(p.get("foo"), "123.4");
+        QCOMPARE(p.get_int("foo"), 123);
+        QCOMPARE(p.get_double("foo"), 123.4);
     }
 };
 

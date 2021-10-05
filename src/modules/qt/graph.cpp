@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2015-2020 Meltytech, LLC
- * Author: Brian Matherly <code@brianmatherly.com>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -18,6 +17,7 @@
  */
 
 #include "graph.h"
+#include <QPainterPath>
 #include <QVector>
 #include <math.h>
 
@@ -61,7 +61,7 @@ void setup_graph_pen(QPainter& p, QRectF& r, mlt_properties filter_properties , 
 	// Find user specified colors for the gradient
 	while( color_found ) {
 		QString prop_name = QString("color.") + QString::number(colors.size() + 1);
-		if( mlt_properties_get(filter_properties, prop_name.toUtf8().constData() ) ) {
+		if( mlt_properties_exists(filter_properties, prop_name.toUtf8().constData() ) ) {
 			mlt_color mcolor = mlt_properties_get_color( filter_properties, prop_name.toUtf8().constData() );
 			colors.append( QColor( mcolor.r, mcolor.g, mcolor.b, mcolor.a ) );
 		} else {

@@ -21,7 +21,9 @@
 #ifndef MLTPP_H
 #define MLTPP_H
 
+#include "MltAudio.h"
 #include "MltAnimation.h"
+#include "MltChain.h"
 #include "MltConsumer.h"
 #include "MltDeque.h"
 #include "MltEvent.h"
@@ -30,7 +32,7 @@
 #include "MltFilter.h"
 #include "MltFilteredConsumer.h"
 #include "MltFrame.h"
-#include "MltGeometry.h"
+#include "MltImage.h"
 #include "MltMultitrack.h"
 #include "MltParser.h"
 #include "MltPlaylist.h"

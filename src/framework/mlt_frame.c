@@ -3,7 +3,7 @@
  * \brief interface for all frame classes
  * \see mlt_frame_s
  *
- * Copyright (C) 2003-2020 Meltytech, LLC
+ * Copyright (C) 2003-2019 Meltytech, LLC
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -21,6 +21,7 @@
  */
 
 #include "mlt_frame.h"
+#include "mlt_image.h"
 #include "mlt_producer.h"
 #include "mlt_factory.h"
 #include "mlt_profile.h"
@@ -133,27 +134,6 @@ double mlt_frame_get_aspect_ratio( mlt_frame self )
 int mlt_frame_set_aspect_ratio( mlt_frame self, double value )
 {
 	return mlt_properties_set_double( MLT_FRAME_PROPERTIES( self ), "aspect_ratio", value );
-}
-
-/** Get the consumer preview resolution scale factor.
- *
- * If a composition is authored at a particular resolution and has some
- * property values expressed in terms of pixels, then to preview at a different
- * resolution services needs to know how to scale the pixels values. This
- * scale factored is expressed using the scale property on the consumer.
- * This function provides convenient access to that scale factor for the
- * services.
- * \public \memberof  mlt_frame_s
- * \param self a frame
- * \return the scale factor to apply to pixel resolution values
- */
-
-double mlt_frame_resolution_scale(mlt_frame self)
-{
-	double result = mlt_properties_get_double(MLT_FRAME_PROPERTIES(self), "consumer_scale");
-	if (result == 0.0)
-		result = 1.0;
-	return result;
 }
 
 /** Get the time position of this frame.
@@ -369,7 +349,6 @@ int mlt_frame_set_image( mlt_frame self, uint8_t *image, int size, mlt_destructo
 
 int mlt_frame_set_alpha( mlt_frame self, uint8_t *alpha, int size, mlt_destructor destroy )
 {
-	self->get_alpha_mask = NULL;
 	return mlt_properties_set_data( MLT_FRAME_PROPERTIES( self ), "alpha", alpha, size, destroy, NULL );
 }
 
@@ -409,94 +388,6 @@ void mlt_frame_replace_image( mlt_frame self, uint8_t *image, mlt_image_format f
 	mlt_properties_set_int( MLT_FRAME_PROPERTIES( self ), "width", width );
 	mlt_properties_set_int( MLT_FRAME_PROPERTIES( self ), "height", height );
 	mlt_properties_set_int( MLT_FRAME_PROPERTIES( self ), "format", format );
-	self->get_alpha_mask = NULL;
-}
-
-/** Get the short name for an image format.
- *
- * \public \memberof mlt_frame_s
- * \param format the image format
- * \return a string
- */
-
-const char * mlt_image_format_name( mlt_image_format format )
-{
-	switch ( format )
-	{
-		case mlt_image_none:    return "none";
-		case mlt_image_rgb24:   return "rgb24";
-		case mlt_image_rgb24a:  return "rgb24a";
-		case mlt_image_yuv422:  return "yuv422";
-		case mlt_image_yuv420p: return "yuv420p";
-		case mlt_image_opengl:  return "opengl";
-		case mlt_image_glsl:    return "glsl";
-		case mlt_image_glsl_texture: return "glsl_texture";
-		case mlt_image_yuv422p16: return "yuv422p16";
-		case mlt_image_invalid: return "invalid";
-	}
-	return "invalid";
-}
-
-/** Get the id of image format from short name.
- *
- * \public \memberof mlt_frame_s
- * \param name the image format short name
- * \return a image format
- */
-
-mlt_image_format mlt_image_format_id( const char * name )
-{
-	mlt_image_format f;
-
-	for( f = mlt_image_none; name && f < mlt_image_invalid; f++ )
-	{
-		const char * v = mlt_image_format_name( f );
-		if( !strcmp( v, name ) )
-			return f;
-	}
-
-	return mlt_image_invalid;
-}
-
-/** Get the number of bytes needed for an image.
-  *
-  * \public \memberof mlt_frame_s
-  * \param format the image format
-  * \param width width of the image in pixels
-  * \param height height of the image in pixels
-  * \param[out] bpp the number of bytes per pixel (optional)
-  * \return the number of bytes
-  */
-int mlt_image_format_size( mlt_image_format format, int width, int height, int *bpp )
-{
-	height += 1;
-	switch ( format )
-	{
-		case mlt_image_rgb24:
-			if ( bpp ) *bpp = 3;
-			return width * height * 3;
-		case mlt_image_opengl:
-		case mlt_image_rgb24a:
-			if ( bpp ) *bpp = 4;
-			return width * height * 4;
-		case mlt_image_yuv422:
-			if ( bpp ) *bpp = 2;
-			return width * height * 2;
-		case mlt_image_yuv420p:
-			if ( bpp ) *bpp = 3 / 2;
-			return width * height * 3 / 2;
-		case mlt_image_glsl:
-		case mlt_image_glsl_texture:
-			if ( bpp ) *bpp = 0;
-			return 4;
-		case mlt_image_yuv422p16:
-			if ( bpp ) *bpp = 0;
-			return 4 * height * width ;
-		default:
-			if ( bpp ) *bpp = 0;
-			return 0;
-	}
-	return 0;
 }
 
 static int generate_test_image( mlt_properties properties, uint8_t **buffer,  mlt_image_format *format, int *width, int *height, int writable )
@@ -532,75 +423,34 @@ static int generate_test_image( mlt_properties properties, uint8_t **buffer,  ml
 	}
 	if ( error && buffer )
 	{
-		int size = 0;
-
 		*width = *width == 0 ? 720 : *width;
 		*height = *height == 0 ? 576 : *height;
-		size = *width * *height;
+		switch( *format )
+		{
+			case mlt_image_rgb:
+			case mlt_image_rgba:
+			case mlt_image_yuv422:
+			case mlt_image_yuv422p16:
+			case mlt_image_yuv420p:
+				break;
+			case mlt_image_none:
+			case mlt_image_movit:
+			case mlt_image_opengl_texture:
+				*format = mlt_image_yuv422;
+				break;
+		}
 
+		struct mlt_image_s img;
+		mlt_image_set_values( &img, NULL, *format, *width, *height );
+		mlt_image_alloc_data( &img );
+		mlt_image_fill_black( &img );
+
+		*buffer = img.data;
 		mlt_properties_set_int( properties, "format", *format );
 		mlt_properties_set_int( properties, "width", *width );
 		mlt_properties_set_int( properties, "height", *height );
 		mlt_properties_set_double( properties, "aspect_ratio", 1.0 );
-
-		switch( *format )
-		{
-			case mlt_image_rgb24:
-				size *= 3;
-				size += *width * 3;
-				*buffer = mlt_pool_alloc( size );
-				if ( *buffer )
-					memset( *buffer, 255, size );
-				break;
-			case mlt_image_rgb24a:
-			case mlt_image_opengl:
-				size *= 4;
-				size += *width * 4;
-				*buffer = mlt_pool_alloc( size );
-				if ( *buffer )
-					memset( *buffer, 255, size );
-				break;
-			case mlt_image_none:
-			case mlt_image_glsl:
-			case mlt_image_glsl_texture:
-				*format = mlt_image_yuv422;
-			case mlt_image_yuv422:
-				size *= 2;
-				size += *width * 2;
-				*buffer = mlt_pool_alloc( size );
-				if ( *buffer )
-				{
-					register uint8_t *p = *buffer;
-					register uint8_t *q = p + size;
-					while ( p != NULL && p != q )
-					{
-						*p ++ = 235;
-						*p ++ = 128;
-					}
-				}
-				break;
-			case mlt_image_yuv422p16:
-			case mlt_image_yuv420p:
-				size = mlt_image_format_size( *format, *width, *height, NULL );
-				*buffer = mlt_pool_alloc( size );
-				if ( *buffer )
-				{
-					int strides[4];
-					uint8_t* planes[4];
-					int h = *height;
-					mlt_image_format_planes( *format, *width, *height, *buffer, planes, strides );
-					memset(planes[0], 235, h * strides[0]);
-					if ( *format == mlt_image_yuv420p )
-						h /= 2;
-					memset(planes[1], 128, h * strides[1]);
-					memset(planes[2], 128, h * strides[2]);
-				}
-				break;
-			default:
-				size = 0;
-				break;
-		}
-		mlt_properties_set_data( properties, "image", *buffer, size, ( mlt_destructor )mlt_pool_release, NULL );
+		mlt_properties_set_data( properties, "image", *buffer, 0, img.release_data, NULL );
 		mlt_properties_set_int( properties, "test_image", 1 );
 		error = 0;
 	}
@@ -672,41 +522,7 @@ int mlt_frame_get_image( mlt_frame self, uint8_t **buffer, mlt_image_format *for
 	return error;
 }
 
-/** Get the alpha channel associated to the frame.
- *
- * Unlike mlt_frame_get_alpha(), this function WILL create an opaque alpha
- * channel if one does not already exist.
- *
- * \public \memberof mlt_frame_s
- * \deprecated use mlt_frame_get_alpha() instead
- * \param self a frame
- * \return the alpha channel
- */
-
-uint8_t *mlt_frame_get_alpha_mask( mlt_frame self )
-{
-	uint8_t *alpha = NULL;
-	if ( self != NULL )
-	{
-		if ( self->get_alpha_mask != NULL )
-			alpha = self->get_alpha_mask( self );
-		if ( alpha == NULL )
-			alpha = mlt_properties_get_data( &self->parent, "alpha", NULL );
-		if ( alpha == NULL )
-		{
-			int size = mlt_properties_get_int( &self->parent, "width" ) * mlt_properties_get_int( &self->parent, "height" );
-			alpha = mlt_pool_alloc( size );
-			memset( alpha, 255, size );
-			mlt_properties_set_data( &self->parent, "alpha", alpha, size, mlt_pool_release, NULL );
-		}
-	}
-	return alpha;
-}
-
 /** Get the alpha channel associated to the frame (without creating if it has not).
- *
- * Unlike mlt_frame_get_alpha_mask(), this function does NOT create an alpha
- * channel if one does not already exist.
  *
  * \public \memberof mlt_frame_s
  * \param self a frame
@@ -718,59 +534,9 @@ uint8_t *mlt_frame_get_alpha( mlt_frame self )
 	uint8_t *alpha = NULL;
 	if ( self != NULL )
 	{
-		if ( self->get_alpha_mask != NULL )
-			alpha = self->get_alpha_mask( self );
-		if ( alpha == NULL )
-			alpha = mlt_properties_get_data( &self->parent, "alpha", NULL );
+		alpha = mlt_properties_get_data( &self->parent, "alpha", NULL );
 	}
 	return alpha;
-}
-
-/** Get the short name for an audio format.
- *
- * You do not need to deallocate the returned string.
- * \public \memberof mlt_frame_s
- * \param format an audio format enum
- * \return a string for the name of the image format
- */
-
-const char * mlt_audio_format_name( mlt_audio_format format )
-{
-	switch ( format )
-	{
-		case mlt_audio_none:   return "none";
-		case mlt_audio_s16:    return "s16";
-		case mlt_audio_s32:    return "s32";
-		case mlt_audio_s32le:  return "s32le";
-		case mlt_audio_float:  return "float";
-		case mlt_audio_f32le:  return "f32le";
-		case mlt_audio_u8:     return "u8";
-	}
-	return "invalid";
-}
-
-/** Get the amount of bytes needed for a block of audio.
-  *
-  * \public \memberof mlt_frame_s
-  * \param format an audio format enum
-  * \param samples the number of samples per channel
-  * \param channels the number of channels
-  * \return the number of bytes
-  */
-
-int mlt_audio_format_size( mlt_audio_format format, int samples, int channels )
-{
-	switch ( format )
-	{
-		case mlt_audio_none:   return 0;
-		case mlt_audio_s16:    return samples * channels * sizeof( int16_t );
-		case mlt_audio_s32le:
-		case mlt_audio_s32:    return samples * channels * sizeof( int32_t );
-		case mlt_audio_f32le:
-		case mlt_audio_float:  return samples * channels * sizeof( float );
-		case mlt_audio_u8:     return samples * channels;
-	}
-	return 0;
 }
 
 /** Get the audio associated to the frame.
@@ -782,7 +548,7 @@ int mlt_audio_format_size( mlt_audio_format format, int samples, int channels )
  * on properties and filters. You do not need to supply a pre-allocated
  * buffer, but you should always supply the desired audio format.
  * The audio is always in interleaved format.
- * You should use the \p mlt_sample_calculator to determine the number of samples you want.
+ * You should use the \p mlt_audio_sample_calculator to determine the number of samples you want.
  *
  * \public \memberof mlt_frame_s
  * \param self a frame
@@ -909,13 +675,13 @@ unsigned char *mlt_frame_get_waveform( mlt_frame self, int w, int h )
 	int channels = 2;
 	mlt_producer producer = mlt_frame_get_original_producer( self );
 	double fps = mlt_producer_get_fps( mlt_producer_cut_parent( producer ) );
-	int samples = mlt_sample_calculator( fps, frequency, mlt_frame_get_position( self ) );
+	int samples = mlt_audio_calculate_frame_samples( fps, frequency, mlt_frame_get_position( self ) );
 
 	// Increase audio resolution proportional to requested image size
 	while ( samples < w )
 	{
 		frequency += 16000;
-		samples = mlt_sample_calculator( fps, frequency, mlt_frame_get_position( self ) );
+		samples = mlt_audio_calculate_frame_samples( fps, frequency, mlt_frame_get_position( self ) );
 	}
 
 	// Get the pcm data
@@ -1006,56 +772,11 @@ void mlt_frame_close( mlt_frame self )
 
 /***** convenience functions *****/
 
-/** Determine the number of samples that belong in a frame at a time position.
- *
- * \public \memberof mlt_frame_s
- * \param fps the frame rate
- * \param frequency the sample rate
- * \param position the time position
- * \return the number of samples per channel
- */
-
-int mlt_sample_calculator( float fps, int frequency, int64_t position )
-{
-	/* Compute the cumulative number of samples until the start of this frame and the
-	cumulative number of samples until the start of the next frame. Round each to the
-	nearest integer and take the difference to determine the number of samples in
-	this frame.
-
-	This approach should prevent rounding errors that can accumulate over a large number
-	of frames causing A/V sync problems. */
-	return mlt_sample_calculator_to_now( fps, frequency, position + 1 )
-		 - mlt_sample_calculator_to_now( fps, frequency, position );
-}
-
-/** Determine the number of samples that belong before a time position.
- *
- * \public \memberof mlt_frame_s
- * \param fps the frame rate
- * \param frequency the sample rate
- * \param position the time position
- * \return the number of samples per channel
- * \bug Will this break when mlt_position is converted to double?
- */
-
-int64_t mlt_sample_calculator_to_now( float fps, int frequency, int64_t position )
-{
-	int64_t samples = 0;
-
-	if ( fps )
-	{
-		samples = (int64_t)( (double) position * (double) frequency / (double) fps +
-			( position < 0 ? -0.5 : 0.5 ) );
-	}
-
-	return samples;
-}
-
 void mlt_frame_write_ppm( mlt_frame frame )
 {
 	int width = 0;
 	int height = 0;
-	mlt_image_format format = mlt_image_rgb24;
+	mlt_image_format format = mlt_image_rgb;
 	uint8_t *image;
 	
 	if ( mlt_frame_get_image( frame, &image, &format, &width, &height, 0 ) == 0 )
@@ -1207,189 +928,4 @@ mlt_frame mlt_frame_clone( mlt_frame self, int is_deep )
 	}
 
 	return new_frame;
-}
-
-/** Build a planes pointers of image mapping
- *
- * For proper and unified planar image processing, planes sizes and planes pointers should
- * be provides to processing code.
- *
- * \public \memberof mlt_frame_s
- * \param format the image format
- * \param width width of the image in pixels
- * \param height height of the image in pixels
- * \param[in] data pointer to allocated image
- * \param[out] planes pointers to plane's pointers will be set
- * \param[out] strides pointers to plane's strides will be set
- * \return the number of bytes
- */
-int mlt_image_format_planes( mlt_image_format format, int width, int height, void* data, unsigned char *planes[4], int strides[4])
-{
-	if ( mlt_image_yuv422p16 == format )
-	{
-		strides[0] = width * 2;
-		strides[1] = width;
-		strides[2] = width;
-		strides[3] = 0;
-
-		planes[0] = (unsigned char*)data;
-		planes[1] = planes[0] + height * strides[0];
-		planes[2] = planes[1] + height * strides[1];
-		planes[3] = 0;
-	}
-	else if ( mlt_image_yuv420p == format )
-	{
-		strides[0] = width;
-		strides[1] = width >> 1;
-		strides[2] = width >> 1;
-		strides[3] = 0;
-
-		planes[0] = (unsigned char*)data;
-		planes[1] = (unsigned char*)data + width * height;
-		planes[2] = (unsigned char*)data + ( 5 * width * height ) / 4;
-		planes[3] = 0;
-	}
-	else
-	{
-		int bpp;
-
-		mlt_image_format_size( format, width, height, &bpp );
-
-		planes[0] = data;
-		planes[1] = 0;
-		planes[2] = 0;
-		planes[3] = 0;
-
-		strides[0] = bpp * width;
-		strides[1] = 0;
-		strides[2] = 0;
-		strides[3] = 0;
-	};
-
-	return 0;
-}
-
-/** Get the short name for a channel configuration.
- *
- * You do not need to deallocate the returned string.
- * \public \member of mlt_frame_s
- * \param cfg a channel configuration enum
- * \return a string for the name of the channel configuration
- */
-
-const char * mlt_channel_layout_name( mlt_channel_layout layout )
-{
-	switch ( layout )
-	{
-		case mlt_channel_auto:           return "auto";
-		case mlt_channel_independent:    return "independent";
-		case mlt_channel_mono:           return "mono";
-		case mlt_channel_stereo:         return "stereo";
-		case mlt_channel_2p1:            return "2.1";
-		case mlt_channel_3p0:            return "3.0";
-		case mlt_channel_3p0_back:       return "3.0(back)";
-		case mlt_channel_4p0:            return "4.0";
-		case mlt_channel_quad_back:      return "quad";
-		case mlt_channel_quad_side:      return "quad(side)";
-		case mlt_channel_3p1:            return "3.1";
-		case mlt_channel_5p0_back:       return "5.0";
-		case mlt_channel_5p0:            return "5.0(side)";
-		case mlt_channel_4p1:            return "4.1";
-		case mlt_channel_5p1_back:       return "5.1";
-		case mlt_channel_5p1:            return "5.1(side)";
-		case mlt_channel_6p0:            return "6.0";
-		case mlt_channel_6p0_front:      return "6.0(front)";
-		case mlt_channel_hexagonal:      return "hexagonal";
-		case mlt_channel_6p1:            return "6.1";
-		case mlt_channel_6p1_back:       return "6.1(back)";
-		case mlt_channel_6p1_front:      return "6.1(front)";
-		case mlt_channel_7p0:            return "7.0";
-		case mlt_channel_7p0_front:      return "7.0(front)";
-		case mlt_channel_7p1:            return "7.1";
-		case mlt_channel_7p1_wide_side:  return "7.1(wide-side)";
-		case mlt_channel_7p1_wide_back:  return "7.1(wide)";
-	}
-	return "invalid";
-}
-
-/** Get the id of channel configuration from short name.
- *
- * \public \memberof mlt_frame_s
- * \param name the channel configuration short name
- * \return a channel configuration
- */
-
-mlt_channel_layout mlt_channel_layout_id( const char * name )
-{
-	if( name )
-	{
-		mlt_channel_layout c;
-		for( c = mlt_channel_auto; c <= mlt_channel_7p1_wide_back; c++ )
-		{
-			const char * v = mlt_channel_layout_name( c );
-			if( !strcmp( v, name ) )
-				return c;
-		}
-	}
-	return mlt_channel_auto;
-}
-
-/** Get the number of channels for a channel configuration.
- *
- * \public \memberof mlt_frame_s
- * \param cfg a channel configuration enum
- * \return the number of channels for the channel configuration
- */
-
-int mlt_channel_layout_channels( mlt_channel_layout layout )
-{
-	switch ( layout )
-	{
-		case mlt_channel_auto:           return 0;
-		case mlt_channel_independent:    return 0;
-		case mlt_channel_mono:           return 1;
-		case mlt_channel_stereo:         return 2;
-		case mlt_channel_2p1:            return 3;
-		case mlt_channel_3p0:            return 3;
-		case mlt_channel_3p0_back:       return 3;
-		case mlt_channel_4p0:            return 4;
-		case mlt_channel_quad_back:      return 4;
-		case mlt_channel_quad_side:      return 4;
-		case mlt_channel_3p1:            return 4;
-		case mlt_channel_5p0_back:       return 5;
-		case mlt_channel_5p0:            return 5;
-		case mlt_channel_4p1:            return 5;
-		case mlt_channel_5p1_back:       return 6;
-		case mlt_channel_5p1:            return 6;
-		case mlt_channel_6p0:            return 6;
-		case mlt_channel_6p0_front:      return 6;
-		case mlt_channel_hexagonal:      return 6;
-		case mlt_channel_6p1:            return 7;
-		case mlt_channel_6p1_back:       return 7;
-		case mlt_channel_6p1_front:      return 7;
-		case mlt_channel_7p0:            return 7;
-		case mlt_channel_7p0_front:      return 7;
-		case mlt_channel_7p1:            return 8;
-		case mlt_channel_7p1_wide_back:  return 8;
-		case mlt_channel_7p1_wide_side:  return 8;
-	}
-	return 0;
-}
-
-/** Get a default channel configuration for a given number of channels.
- *
- * \public \memberof mlt_frame_s
- * \param channels the number of channels
- * \return the default channel configuration
- */
-
-mlt_channel_layout mlt_channel_layout_default( int channels )
-{
-	mlt_channel_layout c;
-	for( c = mlt_channel_mono; c <= mlt_channel_7p1_wide_back; c++ )
-	{
-		if( mlt_channel_layout_channels( c ) == channels )
-			return c;
-	}
-	return mlt_channel_independent;
 }

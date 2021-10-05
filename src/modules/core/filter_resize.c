@@ -1,6 +1,6 @@
 /*
  * filter_resize.c -- resizing filter
- * Copyright (C) 2003-2014 Meltytech, LLC
+ * Copyright (C) 2003-2020 Meltytech, LLC
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -85,30 +85,28 @@ static void resize_image( uint8_t *output, int owidth, int oheight, uint8_t *inp
 		return;
 	}
 
-	if ( format == mlt_image_rgb24a )
+	if ( format == mlt_image_rgba )
 	{
-		while ( size -- )
-		{
-			*p ++ = 0;
-			*p ++ = 0;
-			*p ++ = 0;
-			*p ++ = alpha_value;
+		memset(p, 0, size * bpp);
+		if (alpha_value != 0) {
+			while (size--) {
+				p[3] = alpha_value;
+				p += 4;
+			}
 		}
 	}
 	else if ( bpp == 2 )
 	{
-		while( size -- )
-		{
-			*p ++ = 16;
-			*p ++ = 128;
+		memset(p, 16, size * bpp);
+		while (size--) {
+			p[1] = 128;
+			p += 2;
 		}
 		offset_x -= offset_x % 4;
 	}
 	else
 	{
-		size *= bpp;
-		while ( size-- )
-			*p ++ = 0;
+		memset(p, 0, size * bpp);
 	}
 
 	out_line = output + offset_y * ostride;
@@ -162,7 +160,7 @@ static uint8_t *frame_resize_image( mlt_frame frame, int owidth, int oheight, ml
 		mlt_frame_set_image( frame, output, owidth * ( oheight + 1 ) * bpp, mlt_pool_release );
 
 		// We should resize the alpha too
-		if ( format != mlt_image_rgb24a && alpha && alpha_size >= iwidth * iheight )
+		if ( format != mlt_image_rgba && alpha && alpha_size >= iwidth * iheight )
 		{
 			alpha = resize_alpha( alpha, owidth, oheight, iwidth, iheight, alpha_value );
 			if ( alpha )
@@ -217,7 +215,7 @@ static int filter_get_image( mlt_frame frame, uint8_t **image, mlt_image_format 
 	// after the deinterlace filter, which only operates in YUV to avoid a YUV->RGB->YUV->?.
 	// Instead, it will go YUV->RGB->?.
 	if ( mlt_properties_get_int( properties, "force_full_luma" ) )
-		*format = mlt_image_rgb24a;
+		*format = mlt_image_rgba;
 
 	// Hmmm...
 	char *rescale = mlt_properties_get( properties, "rescale.interp" );
@@ -276,13 +274,20 @@ static int filter_get_image( mlt_frame frame, uint8_t **image, mlt_image_format 
 	}
 
 	// Now get the image
-	if ( *format == mlt_image_yuv422 )
+	if ( *format == mlt_image_yuv422 ) {
 		owidth -= owidth % 2;
+		*width -= *width % 2;
+	}
 	error = mlt_frame_get_image( frame, image, format, &owidth, &oheight, writable );
 
 	if ( error == 0 && *image && *format != mlt_image_yuv420p )
 	{
 		*image = frame_resize_image( frame, *width, *height, *format );
+	}
+	else
+	{
+		*width = owidth;
+		*height = oheight;
 	}
 
 	return error;

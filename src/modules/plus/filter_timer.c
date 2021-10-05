@@ -38,7 +38,8 @@ double time_to_seconds( char* time )
 static void get_timer_str( mlt_filter filter, mlt_frame frame, char* text )
 {
 	mlt_properties properties = MLT_FILTER_PROPERTIES( filter );
-	mlt_position current_frame = mlt_filter_get_position( filter, frame );
+	double filter_speed = mlt_properties_get_double( properties, "speed" );
+	mlt_position current_frame = mlt_filter_get_position( filter, frame ) * filter_speed;
 	char* direction = mlt_properties_get( properties, "direction" );
 	double timer_start = time_to_seconds( mlt_properties_get( properties, "start" ) );
 	double timer_duration = time_to_seconds( mlt_properties_get( properties, "duration" ) );
@@ -50,17 +51,17 @@ static void get_timer_str( mlt_filter filter, mlt_frame frame, char* text )
 		// "duration" of zero means entire length of the filter.
 		mlt_position filter_length = mlt_filter_get_length2( filter, frame ) - 1;
 		double filter_duration = time_to_seconds( mlt_properties_frames_to_time( properties, filter_length, mlt_time_clock ) );
-		timer_duration = filter_duration - timer_start;
+		timer_duration = (filter_duration - timer_start) * filter_speed;
 	}
 
-	if ( value < timer_start )
+	if ( value < timer_start * filter_speed)
 	{
 		// Hold at 0 until start time.
 		value = 0.0;
 	}
 	else
 	{
-		value = value - timer_start;
+		value = value - timer_start * filter_speed;
 		if ( value > timer_duration )
 		{
 			// Hold at duration after the timer has elapsed.
@@ -98,6 +99,10 @@ static void get_timer_str( mlt_filter filter, mlt_frame frame, char* text )
 	{
 		snprintf( text, MAX_TEXT_LEN, "%02d:%05.2f", hours * 60 + mins, floor(secs * 100.0) / 100.0 );
 	}
+	else if ( !strcmp( format, "MM:SS.SSS" ) )
+	{
+		snprintf( text, MAX_TEXT_LEN, "%02d:%06.3f", hours * 60 + mins, floor(secs * 1000.0) / 1000.0 );
+	}
 	else if ( !strcmp( format, "SS" ) )
 	{
 		snprintf( text, MAX_TEXT_LEN, "%02d", (int)floor(value) );
@@ -109,6 +114,10 @@ static void get_timer_str( mlt_filter filter, mlt_frame frame, char* text )
 	else if ( !strcmp( format, "SS.SS" ) )
 	{
 		snprintf( text, MAX_TEXT_LEN, "%05.2f", floor(value * 100.0) / 100.0 );
+	}
+	else if ( !strcmp( format, "SS.SSS" ) )
+	{
+		snprintf( text, MAX_TEXT_LEN, "%06.3f", floor(value * 1000.0) / 1000.0 );
 	}
 }
 
@@ -152,6 +161,7 @@ mlt_filter filter_timer_init( mlt_profile profile, mlt_service_type type, const 
 		mlt_properties_set( my_properties, "start", "00:00:00.000" );
 		mlt_properties_set( my_properties, "duration", "00:10:00.000" );
 		mlt_properties_set( my_properties, "offset", "00:00:00.000" );
+		mlt_properties_set_double( my_properties, "speed", 1.0 );
 		mlt_properties_set( my_properties, "direction", "up" );
 		mlt_properties_set( my_properties, "geometry", "0%/0%:100%x100%:100%" );
 		mlt_properties_set( my_properties, "family", "Sans" );

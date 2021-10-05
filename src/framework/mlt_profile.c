@@ -446,9 +446,17 @@ void mlt_profile_from_producer( mlt_profile profile, mlt_producer producer )
 				profile->sample_aspect_num = mlt_properties_get_int( p, "meta.media.sample_aspect_num" );
 				profile->sample_aspect_den = mlt_properties_get_int( p, "meta.media.sample_aspect_den" );
 				profile->colorspace = mlt_properties_get_int( p, "meta.media.colorspace" );
-				profile->display_aspect_num = lrint( (double) profile->sample_aspect_num * profile->width
-					/ profile->sample_aspect_den );
-				profile->display_aspect_den = profile->height;
+				int n = profile->display_aspect_num = profile->sample_aspect_num * profile->width;
+				int m = profile->display_aspect_den = profile->sample_aspect_den * profile->height;
+				int gcd, remainder;
+				while (n) {
+					remainder = m % n;
+					m = n;
+					n = remainder;
+				}
+				gcd = m;
+				profile->display_aspect_num /= gcd;
+				profile->display_aspect_den /= gcd;
 				free( profile->description );
 				profile->description = strdup( "automatic" );
 				profile->is_explicit = 0;
@@ -491,4 +499,30 @@ char *mlt_profile_lumas_dir( mlt_profile profile )
 		mlt_environment_set("MLT_LUMAS_DIR", "16_9");
 	}
 	return mlt_environment( "MLT_LUMAS_DIR" );
+}
+
+/** Get the width scale factor.
+ *
+ * \public \memberof mlt_profile_s
+ * \param profile the profile to reference
+ * \param width the number of pixels the consumer requested
+ * \return the scale factor for the width
+ */
+
+double mlt_profile_scale_width(mlt_profile profile, int width)
+{
+	return (profile && width && profile->width)? (double) width / profile->width : 1.0;
+}
+
+/** Get the height scale factor.
+ *
+ * \public \memberof mlt_profile_s
+ * \param profile the profile to reference
+ * \param height the number of pixels the consumer requested
+ * \return the scale factor for the height
+ */
+
+double mlt_profile_scale_height(mlt_profile profile, int height)
+{
+	return (profile && profile->width)? (double) height / profile->height : 1.0;
 }

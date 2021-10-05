@@ -1,6 +1,6 @@
 /*
  * producer_decklink.c -- input from Blackmagic Design DeckLink
- * Copyright (C) 2011-2019 Meltytech, LLC
+ * Copyright (C) 2011-2021 Meltytech, LLC
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -793,8 +793,9 @@ static void producer_close( mlt_producer producer )
 extern "C" {
 
 // Listen for the list_devices property to be set
-static void on_property_changed( void*, mlt_properties properties, const char *name )
+static void on_property_changed( void*, mlt_properties properties, mlt_event_data event_data )
 {
+	const char *name = mlt_event_data_to_string(event_data);
 	IDeckLinkIterator* decklinkIterator = NULL;
 	IDeckLink* decklink = NULL;
 	IDeckLinkInput* decklinkInput = NULL;
@@ -823,7 +824,7 @@ static void on_property_changed( void*, mlt_properties properties, const char *n
 			{
 				char *name_cstr = getCString( name );
 				const char *format = "device.%d";
-				char *key = (char*) calloc( 1, strlen( format ) + 1 );
+				char *key = (char*) calloc( 1, strlen( format ) + 17 );
 
 				sprintf( key, format, i );
 				mlt_properties_set( properties, key, name_cstr );

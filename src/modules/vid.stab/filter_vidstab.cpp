@@ -2,7 +2,7 @@
  * filter_vidstab.cpp
  * Copyright (C) 2013 Marco Gittler <g.marco@freenet.de>
  * Copyright (C) 2013 Jakub Ksiezniak <j.ksiezniak@gmail.com>
- * Copyright (C) 2014 Brian Matherly <pez4brian@yahoo.com>
+ * Copyright (C) 2014-2021 Meltytech, LLC
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -149,7 +149,7 @@ static void init_apply_data( mlt_filter filter, mlt_frame frame, VSPixelFormat v
 	FILE* f = mlt_fopen( filename, "r" );
 	VSManyLocalMotions mlms;
 
-	if( vsReadLocalMotionsFile( f, &mlms ) == VS_OK )
+	if( f && vsReadLocalMotionsFile( f, &mlms ) == VS_OK )
 	{
 		int i = 0;
 		mlt_log_info( MLT_FILTER_SERVICE(filter), "Successfully loaded %d motions\n", vs_vector_size( &mlms ) );
@@ -182,7 +182,7 @@ static void init_apply_data( mlt_filter filter, mlt_frame frame, VSPixelFormat v
 	}
 }
 
-void	destory_analyze_data( vs_analyze* analyze_data )
+void destroy_analyze_data( vs_analyze* analyze_data )
 {
 	if ( analyze_data )
 	{
@@ -219,6 +219,9 @@ static void init_analyze_data( mlt_filter filter, mlt_frame frame, VSPixelFormat
 
 	// Initialize the saved VSMotionDetect
 	vsMotionDetectInit( &analyze_data->md, &conf, &fi );
+#ifdef ASCII_SERIALIZATION_MODE
+	analyze_data->md.serializationMode = ASCII_SERIALIZATION_MODE;
+#endif
 
 	// Initialize the file to save results to
 	char* filename = mlt_properties_get( properties, "filename" );
@@ -226,7 +229,7 @@ static void init_analyze_data( mlt_filter filter, mlt_frame frame, VSPixelFormat
 	if ( vsPrepareFile( &analyze_data->md, analyze_data->results ) != VS_OK )
 	{
 		mlt_log_error( MLT_FILTER_SERVICE(filter), "Can not write to results file: %s\n", filename );
-		destory_analyze_data( analyze_data );
+		destroy_analyze_data( analyze_data );
 		data->analyze_data = NULL;
 	}
 	else
@@ -281,8 +284,9 @@ static void analyze_image( mlt_filter filter, mlt_frame frame, uint8_t* vs_image
 	// If any frames are skipped, analysis data will be incomplete.
 	if( data->analyze_data && pos != data->analyze_data->last_position + 1 )
 	{
-		mlt_log_error( MLT_FILTER_SERVICE(filter), "Bad frame sequence\n" );
-		destory_analyze_data( data->analyze_data );
+		mlt_log_error( MLT_FILTER_SERVICE(filter), "Bad frame sequence pos %d last_position %d\n",
+			pos, data->analyze_data->last_position );
+		destroy_analyze_data( data->analyze_data );
 		data->analyze_data = NULL;
 	}
 
@@ -309,7 +313,7 @@ static void analyze_image( mlt_filter filter, mlt_frame frame, uint8_t* vs_image
 		else
 		{
 			mlt_log_error( MLT_FILTER_SERVICE(filter), "Motion detection failed\n" );
-			destory_analyze_data( data->analyze_data );
+			destroy_analyze_data( data->analyze_data );
 			data->analyze_data = NULL;
 		}
 
@@ -317,7 +321,7 @@ static void analyze_image( mlt_filter filter, mlt_frame frame, uint8_t* vs_image
 		if ( pos + 1 == mlt_filter_get_length2( filter, frame ) )
 		{
 			mlt_log_info( MLT_FILTER_SERVICE(filter), "Analysis complete\n" );
-			destory_analyze_data( data->analyze_data );
+			destroy_analyze_data( data->analyze_data );
 			data->analyze_data = NULL;
 			mlt_properties_set( properties, "results", mlt_properties_get( properties, "filename" ) );
 		}
@@ -334,6 +338,13 @@ static int get_image( mlt_frame frame, uint8_t **image, mlt_image_format *format
 	mlt_properties properties = MLT_FILTER_PROPERTIES( filter );
 	uint8_t* vs_image = NULL;
 	VSPixelFormat vs_format = PF_NONE;
+	mlt_profile profile = mlt_service_profile(MLT_FILTER_SERVICE(filter));
+
+	// Disable consumer scaling
+	if (profile && profile->width && profile->height) {
+		*width = profile->width;
+		*height = profile->height;
+	}
 
 	// VS only works on progressive frames
 	mlt_properties_set_int( MLT_FRAME_PROPERTIES( frame ), "consumer_deinterlace", 1 );
@@ -388,7 +399,7 @@ static void filter_close( mlt_filter filter )
 	vs_data* data = (vs_data*)filter->child;
 	if ( data )
 	{
-		if ( data->analyze_data ) destory_analyze_data( data->analyze_data );
+		if ( data->analyze_data ) destroy_analyze_data( data->analyze_data );
 		if ( data->apply_data ) destory_apply_data( data->apply_data );
 		free( data );
 	}

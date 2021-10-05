@@ -77,7 +77,7 @@ void renderKdenliveTitle(producer_ktitle_qml self, mlt_frame frame,
       QImage rendered_img = self->renderer->render(img.width(), img.height(), img.format());
       memcpy(img.scanLine(0), rendered_img.constBits(), img.width() * img.height()*4);
 
-      self->format = mlt_image_rgb24a;
+      self->format = mlt_image_rgba;
       convert_qimage_to_mlt_rgba(&img, self->rgba_image, width, height);
       self->current_image = (uint8_t *)mlt_pool_alloc(image_size);
 
@@ -102,11 +102,11 @@ void renderKdenliveTitle(producer_ktitle_qml self, mlt_frame frame,
       }
 
       // Convert image to requested format
-      if (format != mlt_image_none && format != mlt_image_glsl &&
+      if (format != mlt_image_none && format != mlt_image_movit &&
           format != self->format)
       {
             uint8_t *buffer = NULL;
-            if (self->format != mlt_image_rgb24a)
+            if (self->format != mlt_image_rgba)
             {
                   // Image buffer was previously converted, revert to original
                   // rgba buffer
@@ -115,7 +115,7 @@ void renderKdenliveTitle(producer_ktitle_qml self, mlt_frame frame,
                   mlt_properties_set_data(producer_props, "_cached_image",
                                           self->current_image, image_size,
                                           mlt_pool_release, NULL);
-                  self->format = mlt_image_rgb24a;
+                  self->format = mlt_image_rgba;
             }
 
             // First, set the image so it can be converted when we get it

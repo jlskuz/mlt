@@ -95,10 +95,13 @@ void swab2( const void *from, void *to, int n )
 {
 #if defined(USE_SSE)
 #define SWAB_STEP 16
+	int cnt = n / SWAB_STEP;
+
 	__asm__ volatile
 	(
-		"loop_start:                            \n\t"
-
+		/* "loop_start:                            \n\t" */
+		"1:                                     \n\t"
+		
 		/* load */
 		"movdqa         0(%[from]), %%xmm0      \n\t"
 		"add            $0x10, %[from]          \n\t"
@@ -120,11 +123,12 @@ void swab2( const void *from, void *to, int n )
 		"add            $0x10, %[to]            \n\t"
 
 		"dec            %[cnt]                  \n\t"
-		"jnz            loop_start              \n\t"
+		"jnz            1b                      \n\t"
+		/* "jnz            loop_start              \n\t" */
 
+		: [from]"+r"(from), [to]"+r"(to), [cnt]"+r"(cnt)
 		:
-		: [from]"r"(from), [to]"r"(to), [cnt]"r"(n / SWAB_STEP)
-		//: "xmm0", "xmm1"
+		: "xmm0", "xmm1"
 	);
 
 	from = (unsigned char*) from + n - (n % SWAB_STEP);

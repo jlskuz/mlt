@@ -1,7 +1,6 @@
 /*
  * filter_audiospectrum.cpp -- audio spectrum visualization filter
  * Copyright (c) 2015-2020 Meltytech, LLC
- * Author: Brian Matherly <code@brianmatherly.com>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -177,11 +176,12 @@ static void convert_fft_to_spectrum( mlt_filter filter, mlt_frame frame, int spe
 	}
 }
 
-static void draw_spectrum( mlt_filter filter, mlt_frame frame, QImage* qimg )
+static void draw_spectrum( mlt_filter filter, mlt_frame frame, QImage* qimg, int width, int height )
 {
 	mlt_properties filter_properties = MLT_FILTER_PROPERTIES( filter );
 	mlt_position position = mlt_filter_get_position( filter, frame );
 	mlt_position length = mlt_filter_get_length2( filter, frame );
+	mlt_profile profile = mlt_service_profile(MLT_FILTER_SERVICE(filter));
 	mlt_rect rect = mlt_properties_anim_get_rect( filter_properties, "rect", position, length );
 	if ( strchr( mlt_properties_get( filter_properties, "rect" ), '%' ) ) {
 		rect.x *= qimg->width();
@@ -189,10 +189,11 @@ static void draw_spectrum( mlt_filter filter, mlt_frame frame, QImage* qimg )
 		rect.y *= qimg->height();
 		rect.h *= qimg->height();
 	}
-	double scale = mlt_frame_resolution_scale(frame);
+	double scale = mlt_profile_scale_width(profile, width);
 	rect.x *= scale;
-	rect.y *= scale;
 	rect.w *= scale;
+	scale = mlt_profile_scale_height(profile, height);
+	rect.y *= scale;
 	rect.h *= scale;
 	char* graph_type = mlt_properties_get( filter_properties, "type" );
 	int mirror = mlt_properties_get_int( filter_properties, "mirror" );
@@ -253,14 +254,14 @@ static int filter_get_image( mlt_frame frame, uint8_t **image, mlt_image_format 
 	if( mlt_properties_get_data( frame_properties, pdata->fft_prop_name, NULL ) )
 	{
 		// Get the current image
-		*format = mlt_image_rgb24a;
+		*format = mlt_image_rgba;
 		error = mlt_frame_get_image( frame, image, format, width, height, 1 );
 
 		// Draw the spectrum
 		if( !error ) {
 			QImage qimg( *width, *height, QImage::Format_ARGB32 );
 			convert_mlt_to_qimage_rgba( *image, &qimg, *width, *height );
-			draw_spectrum( filter, frame, &qimg );
+			draw_spectrum( filter, frame, &qimg, *width, *height );
 			convert_qimage_to_mlt_rgba( &qimg, *image, *width, *height );
 		}
 	} else {

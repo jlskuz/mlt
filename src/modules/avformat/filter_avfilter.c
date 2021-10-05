@@ -1,7 +1,6 @@
 /*
  * filter_avfilter.c -- provide various filters based on libavfilter
- * Copyright (C) 2016-2019 Meltytech, LLC
- * Author: Brian Matherly <code@brianmatherly.com>
+ * Copyright (C) 2016-2021 Meltytech, LLC
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -17,6 +16,11 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
+
+#if !defined(_XOPEN_SOURCE) || _XOPEN_SOURCE < 700
+#  undef _XOPEN_SOURCE
+#  define _XOPEN_SOURCE 700
+#endif
 
 #include "common.h"
 
@@ -54,9 +58,10 @@ typedef struct
 	int reset;
 } private_data;
 
-static void property_changed( mlt_service owner, mlt_filter filter, char *name )
+static void property_changed( mlt_service owner, mlt_filter filter, mlt_event_data event_data )
 {
-	if( strncmp( PARAM_PREFIX, name, PARAM_PREFIX_LEN ) == 0 ) {
+	const char *name = mlt_event_data_to_string(event_data);
+	if( name && strncmp( PARAM_PREFIX, name, PARAM_PREFIX_LEN ) == 0 ) {
 		private_data* pdata = (private_data*)filter->child;
 		if( pdata->avfilter )
 		{
@@ -79,9 +84,9 @@ static int mlt_to_av_image_format( mlt_image_format format )
 	{
 	case mlt_image_none:
 		return AV_PIX_FMT_NONE;
-	case mlt_image_rgb24:
+	case mlt_image_rgb:
 		return AV_PIX_FMT_RGB24;
-	case mlt_image_rgb24a:
+	case mlt_image_rgba:
 		return AV_PIX_FMT_RGBA;
 	case mlt_image_yuv422:
 		return AV_PIX_FMT_YUYV422;
@@ -97,29 +102,29 @@ static mlt_image_format get_supported_image_format( mlt_image_format format )
 {
 	switch( format )
 	{
-	case mlt_image_rgb24a:
-		return mlt_image_rgb24a;
-	case mlt_image_rgb24:
-		return mlt_image_rgb24;
+	case mlt_image_rgba:
+		return mlt_image_rgba;
+	case mlt_image_rgb:
+		return mlt_image_rgb;
 	case mlt_image_yuv420p:
 		return mlt_image_yuv420p;
 	default:
 		mlt_log_error(NULL, "[filter_avfilter] Unknown image format requested: %d\n", format );
 	case mlt_image_none:
 	case mlt_image_yuv422:
-	case mlt_image_opengl:
-	case mlt_image_glsl:
-	case mlt_image_glsl_texture:
+	case mlt_image_movit:
+	case mlt_image_opengl_texture:
 		return mlt_image_yuv422;
 	}
 }
 
-static void set_avfilter_options( mlt_filter filter )
+static void set_avfilter_options( mlt_filter filter, double scale)
 {
 	private_data* pdata = (private_data*)filter->child;
 	mlt_properties filter_properties = MLT_FILTER_PROPERTIES(filter);
 	int i;
 	int count = mlt_properties_count( filter_properties );
+	mlt_properties scale_map = mlt_properties_get_data(filter_properties, "_resolution_scale", NULL);
 
 	for( i = 0; i < count; i++ )
 	{
@@ -130,6 +135,15 @@ static void set_avfilter_options( mlt_filter filter )
 			const char* value = mlt_properties_get_value( filter_properties, i );
 			if( opt && value )
 			{
+				if (scale != 1.0) {
+					double scale2 = mlt_properties_get_double(scale_map, opt->name);
+					if (scale2 != 0.0) {
+						double x = mlt_properties_get_double(filter_properties, param_name);
+						x *= scale * scale2;
+						mlt_properties_set_double(filter_properties, "_avfilter_temp", x);
+						value = mlt_properties_get(filter_properties, "_avfilter_temp");
+					}
+				}
 				av_opt_set( pdata->avfilter_ctx->priv, opt->name, value, 0 );
 			}
 		}
@@ -139,8 +153,8 @@ static void set_avfilter_options( mlt_filter filter )
 static void init_audio_filtergraph( mlt_filter filter, mlt_audio_format format, int frequency, int channels )
 {
 	private_data* pdata = (private_data*)filter->child;
-	AVFilter *abuffersrc  = avfilter_get_by_name("abuffer");
-	AVFilter *abuffersink = avfilter_get_by_name("abuffersink");
+	const AVFilter *abuffersrc  = avfilter_get_by_name("abuffer");
+	const AVFilter *abuffersink = avfilter_get_by_name("abuffersink");
 	int sample_fmts[] = { -1, -1 };
 	int sample_rates[] = { -1, -1 };
 	int channel_counts[] = { -1, -1 };
@@ -243,7 +257,7 @@ static void init_audio_filtergraph( mlt_filter filter, mlt_audio_format format, 
 		mlt_log_error( filter, "Cannot create audio filter\n" );
 		goto fail;
 	}
-	set_avfilter_options( filter );
+	set_avfilter_options( filter, 1.0 );
 	ret = avfilter_init_str(  pdata->avfilter_ctx, NULL );
 	if( ret < 0 ) {
 		mlt_log_error( filter, "Cannot init filter\n" );
@@ -276,14 +290,14 @@ fail:
 }
 
 
-static void init_image_filtergraph( mlt_filter filter, mlt_image_format format, int width, int height )
+static void init_image_filtergraph( mlt_filter filter, mlt_image_format format, int width, int height, double resolution_scale )
 {
 	private_data* pdata = (private_data*)filter->child;
 	mlt_profile profile = mlt_service_profile(MLT_FILTER_SERVICE(filter));
-	AVFilter *buffersrc  = avfilter_get_by_name("buffer");
-	AVFilter *buffersink = avfilter_get_by_name("buffersink");
-	AVFilter *scale = avfilter_get_by_name("scale");
-	AVFilter *pad = avfilter_get_by_name("pad");
+	const AVFilter *buffersrc  = avfilter_get_by_name("buffer");
+	const AVFilter *buffersink = avfilter_get_by_name("buffersink");
+	const AVFilter *scale = avfilter_get_by_name("scale");
+	const AVFilter *pad = avfilter_get_by_name("pad");
 	mlt_properties p = mlt_properties_new();
 	enum AVPixelFormat pixel_fmts[] = { -1, -1 };
 	AVRational sar = (AVRational){ profile->sample_aspect_num, profile->frame_rate_den };
@@ -380,7 +394,7 @@ static void init_image_filtergraph( mlt_filter filter, mlt_image_format format, 
 		mlt_log_error( filter, "Cannot create video filter\n" );
 		goto fail;
 	}
-	set_avfilter_options( filter );
+	set_avfilter_options( filter, resolution_scale );
 
 	if ( !strcmp( "lut3d", pdata->avfilter->name ) ) {
 #if defined(__GLIBC__) || defined(__APPLE__) || (__FreeBSD__)
@@ -563,7 +577,7 @@ static int filter_get_audio( mlt_frame frame, void **buffer, mlt_audio_format *f
 	mlt_filter filter = mlt_frame_pop_audio( frame );
 	private_data* pdata = (private_data*)filter->child;
 	double fps = mlt_profile_fps( mlt_service_profile(MLT_FILTER_SERVICE(filter)) );
-	int64_t samplepos = mlt_sample_calculator_to_now( fps, *frequency, get_position(filter, frame) );
+	int64_t samplepos = mlt_audio_calculate_samples_to_position( fps, *frequency, get_position(filter, frame) );
 	int bufsize = 0;
 	int ret;
 
@@ -668,7 +682,11 @@ static int filter_get_image( mlt_frame frame, uint8_t **image, mlt_image_format 
 	int ret;
 
 	mlt_log_debug(MLT_FILTER_SERVICE(filter), "position %"PRId64"\n", pos);
-	*format = get_supported_image_format( *format );
+	if (mlt_properties_get_int(MLT_FILTER_PROPERTIES(filter), "_yuv_only")) {
+		*format = mlt_image_yuv422;
+	} else {
+		*format = get_supported_image_format(*format);
+	}
 
 	mlt_frame_get_image( frame, image, format, width, height, 0 );
 
@@ -676,7 +694,8 @@ static int filter_get_image( mlt_frame frame, uint8_t **image, mlt_image_format 
 
 	if( pdata->reset || pdata->format != *format || pdata->width != *width || pdata->height != *height )
 	{
-		init_image_filtergraph( filter, *format, *width, *height );
+		double scale = mlt_profile_scale_width(profile, *width);
+		init_image_filtergraph( filter, *format, *width, *height, scale );
 		pdata->reset = 0;
 	}
 
@@ -692,25 +711,24 @@ static int filter_get_image( mlt_frame frame, uint8_t **image, mlt_image_format 
 		pdata->avinframe->top_field_first = mlt_properties_get_int( frame_properties, "top_field_first" );
 		pdata->avinframe->color_primaries = mlt_properties_get_int( frame_properties, "color_primaries" );
 		pdata->avinframe->color_trc = mlt_properties_get_int( frame_properties, "color_trc" );
-		av_frame_set_color_range( pdata->avinframe,
-			mlt_properties_get_int( frame_properties, "full_luma" )? AVCOL_RANGE_JPEG : AVCOL_RANGE_MPEG );
+		pdata->avinframe->color_range = mlt_properties_get_int( frame_properties, "full_luma" )? AVCOL_RANGE_JPEG : AVCOL_RANGE_MPEG;
 
 		switch (mlt_properties_get_int( frame_properties, "colorspace" ))
 		{
 		case 240:
-			av_frame_set_colorspace( pdata->avinframe, AVCOL_SPC_SMPTE240M );
+			pdata->avinframe->colorspace = AVCOL_SPC_SMPTE240M;
 			break;
 		case 601:
-			av_frame_set_colorspace( pdata->avinframe, AVCOL_SPC_BT470BG );
+			pdata->avinframe->colorspace = AVCOL_SPC_BT470BG;
 			break;
 		case 709:
-			av_frame_set_colorspace( pdata->avinframe, AVCOL_SPC_BT709 );
+			pdata->avinframe->colorspace = AVCOL_SPC_BT709;
 			break;
 		case 2020:
-			av_frame_set_colorspace( pdata->avinframe, AVCOL_SPC_BT2020_NCL );
+			pdata->avinframe->colorspace = AVCOL_SPC_BT2020_NCL;
 			break;
 		case 2021:
-			av_frame_set_colorspace( pdata->avinframe, AVCOL_SPC_BT2020_CL );
+			pdata->avinframe->colorspace = AVCOL_SPC_BT2020_CL;
 			break;
 		}
 
@@ -743,7 +761,7 @@ static int filter_get_image( mlt_frame frame, uint8_t **image, mlt_image_format 
 			int i;
 			uint8_t* src = *image;
 			uint8_t* dst = pdata->avinframe->data[0];
-			int stride = mlt_image_format_size( *format, *width, 0, NULL );
+			int stride = mlt_image_format_size( *format, *width, 1, NULL );
 			for( i = 0; i < *height; i ++ )
 			{
 				memcpy( dst, src, stride );
@@ -794,7 +812,7 @@ static int filter_get_image( mlt_frame frame, uint8_t **image, mlt_image_format 
 			int i;
 			uint8_t* dst = *image;
 			uint8_t* src = pdata->avoutframe->data[0];
-			int stride = mlt_image_format_size( *format, *width, 0, NULL );
+			int stride = mlt_image_format_size( *format, *width, 1, NULL );
 			for( i = 0; i < *height; i ++ )
 			{
 				memcpy( dst, src, stride );
@@ -860,8 +878,6 @@ mlt_filter filter_avfilter_init( mlt_profile profile, mlt_service_type type, con
 	mlt_filter filter = mlt_filter_new();
 	private_data* pdata = (private_data*)calloc( 1, sizeof(private_data) );
 
-	avfilter_register_all();
-
 	if( pdata && id )
 	{
 		id += 9; // Move past "avfilter."
@@ -886,6 +902,20 @@ mlt_filter filter_avfilter_init( mlt_profile profile, mlt_service_type type, con
 		filter->child = pdata;
 
 		mlt_events_listen( MLT_FILTER_PROPERTIES(filter), filter, "property-changed", (mlt_listener)property_changed );
+
+		mlt_properties param_name_map = mlt_properties_get_data(mlt_global_properties(), "avfilter.resolution_scale", NULL);
+		if (param_name_map) {
+			// Lookup my plugin in the map
+			param_name_map = mlt_properties_get_data(param_name_map, id, NULL);
+			mlt_properties_set_data(MLT_FILTER_PROPERTIES(filter), "_resolution_scale", param_name_map, 0, NULL, NULL);
+		}
+
+		mlt_properties yuv_only = mlt_properties_get_data(mlt_global_properties(), "avfilter.yuv_only", NULL);
+		if (yuv_only) {
+			if (mlt_properties_get(yuv_only, id)) {
+				mlt_properties_set_int(MLT_FILTER_PROPERTIES(filter), "_yuv_only", 1);
+			}
+		}
 	}
 	else
 	{

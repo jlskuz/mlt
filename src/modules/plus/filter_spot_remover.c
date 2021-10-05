@@ -24,7 +24,7 @@
 #include <string.h>
 
 /** Scale a rectangle by the specified factors. */
-mlt_rect scale_rect( mlt_rect rect, double x_scale, double y_scale )
+static mlt_rect scale_rect( mlt_rect rect, double x_scale, double y_scale )
 {
 	rect.x = rect.x / x_scale;
 	rect.y = rect.y / y_scale;
@@ -36,7 +36,7 @@ mlt_rect scale_rect( mlt_rect rect, double x_scale, double y_scale )
 /** Constrain a rect to be within the max dimensions with an additional 1 pixel
   * padding.
   */
-mlt_rect constrain_rect( mlt_rect rect, int max_x, int max_y )
+static mlt_rect constrain_rect( mlt_rect rect, int max_x, int max_y )
 {
 	rect.x = round( rect.x );
 	rect.y = round( rect.y );
@@ -140,10 +140,11 @@ static int filter_get_image( mlt_frame frame, uint8_t **image, mlt_image_format 
 		rect.y *= profile->height;
 		rect.h *= profile->height;
 	}
-	double scale = mlt_frame_resolution_scale(frame);
+	double scale = mlt_profile_scale_width(profile, *width);
 	rect.x *= scale;
-	rect.y *= scale;
 	rect.w *= scale;
+	scale = mlt_profile_scale_height(profile, *height);
+	rect.y *= scale;
 	rect.h *= scale;
 	rect = constrain_rect( rect, profile->width * scale, profile->height * scale);
 	if ( rect.w < 1 || rect.h < 1 )
@@ -154,60 +155,63 @@ static int filter_get_image( mlt_frame frame, uint8_t **image, mlt_image_format 
 
 	switch( *format )
 	{
-		case mlt_image_rgb24a:
-		case mlt_image_rgb24:
+		case mlt_image_rgba:
+		case mlt_image_rgb:
 		case mlt_image_yuv422:
 		case mlt_image_yuv420p:
 			// These formats are all supported
 			break;
 		default:
-			*format = mlt_image_rgb24a;
+			*format = mlt_image_rgba;
 			break;
 	}
 	error = mlt_frame_get_image( frame, image, format, width, height, 1 );
 	if (error) return error;
 
+	struct mlt_image_s img;
+	mlt_image_set_values( &img, *image, *format, *width, *height );
+
 	int i;
 	switch( *format )
 	{
-		case mlt_image_rgb24a:
+		case mlt_image_rgba:
 			for ( i = 0; i < 4; i++ )
 			{
-				remove_spot_channel( *image + i, *width, 4, rect );
+				remove_spot_channel( img.planes[0] + i, img.width, 4, rect );
 			}
 			break;
-		case mlt_image_rgb24:
+		case mlt_image_rgb:
 			for ( i = 0; i < 3; i++ )
 			{
-				remove_spot_channel( *image + i, *width, 3, rect );
+				remove_spot_channel( img.planes[0] + i, img.width, 3, rect );
 			}
 			break;
 		case mlt_image_yuv422:
 			// Y
-			remove_spot_channel( *image, *width, 2, rect );
+			remove_spot_channel( img.planes[0], img.width, 2, rect );
 			// U
-			remove_spot_channel( *image + 1, *width / 2, 4,
-								 constrain_rect( scale_rect( rect, 2, 1 ), *width / 2, *height ) );
+			remove_spot_channel( img.planes[0] + 1, img.width / 2, 4,
+								 constrain_rect( scale_rect( rect, 2, 1 ), img.width / 2, img.height ) );
 			// V
-			remove_spot_channel( *image + 3, *width / 2, 4,
-								 constrain_rect( scale_rect( rect, 2, 1 ), *width / 2, *height ) );
+			remove_spot_channel( img.planes[0] + 3, img.width / 2, 4,
+								 constrain_rect( scale_rect( rect, 2, 1 ), img.width / 2, img.height ) );
 			break;
 		case mlt_image_yuv420p:
 			// Y
-			remove_spot_channel( *image, *width, 1, rect );
+			remove_spot_channel( img.planes[0], img.width, 1, rect );
 			// U
-			remove_spot_channel( *image + (*width * *height), *width / 2, 1,
-								 constrain_rect( scale_rect( rect, 2, 2 ), *width / 2, *height / 2 ) );
+			remove_spot_channel( img.planes[1], img.width / 2, 1,
+								 constrain_rect( scale_rect( rect, 2, 2 ), img.width / 2, img.height / 2 ) );
 			// V
-			remove_spot_channel( *image + (*width * *height * 5 / 4), *width / 2, 1,
-								 constrain_rect( scale_rect( rect, 2, 2 ), *width / 2, *height / 2 ) );
+			remove_spot_channel( img.planes[2], img.width / 2, 1,
+								 constrain_rect( scale_rect( rect, 2, 2 ), img.width / 2, img.height / 2 ) );
 			break;
 		default:
 			return 1;
 	}
 
 	uint8_t *alpha = mlt_frame_get_alpha( frame );
-	if ( alpha && *format != mlt_image_rgb24a )
+	if ( alpha && *format != mlt_image_rgba )
 	{
 		remove_spot_channel( alpha, *width, 1, rect );
 	}

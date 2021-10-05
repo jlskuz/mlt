@@ -1,6 +1,6 @@
 /**
  * MltProperties.cpp - MLT Wrapper
- * Copyright (C) 2004-2019 Meltytech, LLC
+ * Copyright (C) 2004-2021 Meltytech, LLC
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -120,7 +120,7 @@ void Properties::unblock( void *object )
 
 int Properties::fire_event( const char *event )
 {
-	return mlt_events_fire( get_properties( ), event, NULL );
+	return mlt_events_fire( get_properties( ), event, mlt_event_data_none() );
 }
 
 bool Properties::is_valid( )
@@ -166,6 +166,11 @@ void *Properties::get_data( const char *name )
 int Properties::set( const char *name, const char *value )
 {
 	return mlt_properties_set( get_properties( ), name, value );
+}
+
+int Properties::set_string(const char *name, const char *value)
+{
+	return mlt_properties_set_string( get_properties( ), name, value );
 }
 
 int Properties::set( const char *name, int value )
@@ -266,23 +271,11 @@ int Properties::save( const char *file )
 	return mlt_properties_save( get_properties( ), file );
 }
 
-#if defined( __APPLE__ ) && GCC_VERSION < 40000
-
-Event *Properties::listen( const char *id, void *object, void (*listener)( ... ) )
-{
-	mlt_event event = mlt_events_listen( get_properties( ), object, id, ( mlt_listener )listener );
-	return new Event( event );
-}
-
-#else
-
 Event *Properties::listen( const char *id, void *object, mlt_listener listener )
 {
 	mlt_event event = mlt_events_listen( get_properties( ), object, id, listener );
 	return new Event( event );
 }
-
-#endif
 
 Event *Properties::setup_wait_for( const char *id )
 {
@@ -341,6 +334,11 @@ const char *Properties::get_lcnumeric( )
 void Properties::clear( const char *name )
 {
 	return mlt_properties_clear( get_properties(), name );
+}
+
+bool Properties::property_exists( const char *name )
+{
+	return mlt_properties_exists( get_properties(), name );
 }
 
 char *Properties::get_time( const char *name, mlt_time_format format )

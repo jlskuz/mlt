@@ -15,9 +15,9 @@ tags:
   - Video
 description: Write or stream audio and/or video using FFmpeg.
 notes: >
-  The avformat consumer uses the FFmpeg/libav libraries to encode to a file or
+  The avformat consumer uses the FFmpeg libraries to encode to a file or
   network stream. You can get a lot of information about how to encode with
-  FFmpeg all over the web including FFmpeg/libav's web site. With melt, you
+  FFmpeg all over the web including FFmpeg's web site. With melt, you
   simply need to add "-consumer avformat:output.file" to the command line
   followed by the encoding parameters by translating ffmpeg's '-option value'
   syntax to melt's 'option=value' syntax.
@@ -401,9 +401,18 @@ parameters:
     title: Pixel format
     type: string
     description: >
-      See 'ffmpeg -pix_fmt list' to see a list of values.
+      See 'ffmpeg -pix_fmts' to see a list of values.
       Normally, this is not required, but some codecs support multiple pixel
       formats, especially chroma bit-depth.
+
+  - identifier: sample_fmt
+    title: Audio sample format
+    type: string
+    description: >
+      See 'ffmpeg -sample_fmts' to see a list of values.
+      Normally, this is not required, but some codecs support multiple sample
+      formats, especially bit-depth and planar vs. interleaved.
+      This is evaluated at a lower priority than mlt_audio_format.
 
   - identifier: qscale
     title: Video quantizer

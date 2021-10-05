@@ -4,7 +4,6 @@ identifier: dynamictext
 title: Dynamic text
 version: 1
 copyright: Meltytech, LLC
-creator: Brian Matherly
 license: LGPLv2.1
 language: en
 tags:
@@ -45,7 +44,7 @@ parameters:
 
   - identifier: geometry
     title: Geometry
-    type: geometry
+    type: rect
     description: A set of X/Y coordinates by which to adjust the text.
     default: 0%/0%:100%x100%:100
 

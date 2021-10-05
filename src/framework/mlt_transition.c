@@ -3,7 +3,7 @@
  * \brief abstraction for all transition services
  * \see mlt_transition_s
  *
- * Copyright (C) 2003-2019 Meltytech, LLC
+ * Copyright (C) 2003-2020 Meltytech, LLC
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -362,7 +362,7 @@ static int get_image_b( mlt_frame b_frame, uint8_t **image, mlt_image_format *fo
 		mlt_frame_set_aspect_ratio( b_frame, mlt_profile_sar( mlt_service_profile( MLT_TRANSITION_SERVICE(self) ) ) );
 
 	mlt_properties_pass_list( b_props, a_props,
-		"consumer_deinterlace, deinterlace_method, consumer_tff, consumer_color_trc, consumer_channel_layout, consumer_scale" );
+		"consumer_deinterlace, deinterlace_method, consumer_tff, consumer_color_trc, consumer_channel_layout" );
 
 	return mlt_frame_get_image( b_frame, image, format, width, height, writable );
 }
@@ -464,8 +464,10 @@ static int transition_get_frame( mlt_service service, mlt_frame_ptr frame, int i
 				if ( !active )
 				{
 					// Hunt for the a_frame
-					while( a_frame <= b_frame && invalid( self->frames[ a_frame ] ) )
+					while (a_frame <= b_frame && (invalid(self->frames[a_frame]) ||
+						  (mlt_properties_get_int(MLT_FRAME_PROPERTIES(self->frames[a_frame]), "hide") & type))) {
 						a_frame ++;
+					}
 
 					// Determine if we're active now
 					active = a_frame != b_frame && !invalid( self->frames[ b_frame ] );

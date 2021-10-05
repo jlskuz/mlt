@@ -102,7 +102,7 @@ static void* consumer_ndi_feeder( void* p )
 			int m_isKeyer = 0, width = profile->width, height = profile->height;
 			uint8_t* image = 0;
 			mlt_frame frm = m_isKeyer ? frame : last;
-			mlt_image_format format = 0 ? mlt_image_rgb24a : mlt_image_yuv422;
+			mlt_image_format format = 0 ? mlt_image_rgba : mlt_image_yuv422;
 			int rendered = mlt_properties_get_int( MLT_FRAME_PROPERTIES( frm ), "rendered" );
 
 			if ( rendered && !mlt_frame_get_image( frm, &image, &format, &width, &height, 0 ) )
@@ -190,7 +190,7 @@ static void* consumer_ndi_feeder( void* p )
 				mlt_audio_format aformat = mlt_audio_s16;
 				int frequency = 48000;
 				int m_channels = 2;
-				int samples = mlt_sample_calculator( mlt_profile_fps( profile ), frequency, self->count );
+				int samples = mlt_audio_calculate_frame_samples( mlt_profile_fps( profile ), frequency, self->count );
 				int16_t *pcm = 0;
 
 				if ( !mlt_frame_get_audio( frm, (void**) &pcm, &aformat, &frequency, &m_channels, &samples ) )
@@ -238,7 +238,7 @@ static void* consumer_ndi_feeder( void* p )
 			last = frame;
 		}
 
-		mlt_events_fire( properties, "consumer-frame-show", frame, NULL );
+		mlt_events_fire( properties, "consumer-frame-show", mlt_event_data_from_frame(frame) );
 	}
 
 	NDIlib_send_destroy( ndi_send );

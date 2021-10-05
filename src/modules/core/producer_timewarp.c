@@ -1,7 +1,6 @@
 /*
  * producer_timewarp.c -- modify speed and direction of a clip
- * Copyright (C) 2015-2019 Meltytech, LLC
- * Author: Brian Matherly <code@brianmatherly.com>
+ * Copyright (C) 2015-2021 Meltytech, LLC
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -23,6 +22,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 
 // Private Types
 typedef struct
@@ -33,13 +33,16 @@ typedef struct
 	mlt_producer clip_producer;
 	mlt_profile clip_profile;
 	mlt_properties clip_parameters;
+	mlt_filter pitch_filter;
 } private_data;
 
 // Private Functions
 
-static void timewarp_property_changed( mlt_service owner, mlt_producer producer, char *name )
+static void timewarp_property_changed( mlt_service owner, mlt_producer producer, mlt_event_data event_data )
 {
 	private_data* pdata = (private_data*)producer->child;
+	const char *name = mlt_event_data_to_string(event_data);
+
 	if ( mlt_properties_get_int( pdata->clip_parameters, name ) ||
 		 !strcmp( name, "length" ) ||
 		 !strcmp( name, "in" ) ||
@@ -58,9 +61,11 @@ static void timewarp_property_changed( mlt_service owner, mlt_producer producer,
 	}
 }
 
-static void clip_property_changed( mlt_service owner, mlt_producer producer, char *name )
+static void clip_property_changed( mlt_service owner, mlt_producer producer, mlt_event_data event_data )
 {
 	private_data* pdata = (private_data*)producer->child;
+	const char *name = mlt_event_data_to_string(event_data);
+
 	if ( mlt_properties_get_int( pdata->clip_parameters, name ) ||
 		 !strcmp( name, "length" ) ||
 		 !strcmp( name, "in" ) ||
@@ -83,114 +88,21 @@ static int producer_get_audio( mlt_frame frame, void** buffer, mlt_audio_format*
 {
 	mlt_producer producer = mlt_frame_pop_audio( frame );
 	private_data* pdata = (private_data*)producer->child;
+	struct mlt_audio_s audio;
+	mlt_audio_set_values( &audio, *buffer, *frequency, *format, *samples, *channels );
 
-	int error = mlt_frame_get_audio( frame, buffer, format, frequency, channels, samples );
+	int error = mlt_frame_get_audio( frame, &audio.data, &audio.format, &audio.frequency, &audio.channels, &audio.samples );
 
 	// Scale the frequency to account for the speed change.
 	// The resample normalizer will convert it to the requested frequency
-	*frequency = (double)*frequency * fabs(pdata->speed);
+	audio.frequency = (double)audio.frequency * fabs(pdata->speed);
 
 	if( pdata->speed < 0.0 )
 	{
-		// Reverse the audio in this frame
-		int c = 0;
-		switch ( *format )
-		{
-			// Interleaved 8bit formats
-			case mlt_audio_u8:
-			{
-				int8_t tmp;
-				for ( c = 0; c < *channels; c++ )
-				{
-					// Pointer to first sample
-					int8_t* a = (int8_t*)*buffer + c;
-					// Pointer to last sample
-					int8_t* b = (int8_t*)*buffer + ((*samples - 1) * *channels) + c;
-					while( a < b )
-					{
-						tmp = *a;
-						*a = *b;
-						*b = tmp;
-						a += *channels;
-						b -= *channels;
-					}
-				}
-				break;
-			}
-			// Interleaved 16bit formats
-			case mlt_audio_s16:
-			{
-				int16_t tmp;
-				for ( c = 0; c < *channels; c++ )
-				{
-					// Pointer to first sample
-					int16_t *a = (int16_t*)*buffer + c;
-					// Pointer to last sample
-					int16_t *b = (int16_t*)*buffer + ((*samples - 1) * *channels) + c;
-					while( a < b )
-					{
-						tmp = *a;
-						*a = *b;
-						*b = tmp;
-						a += *channels;
-						b -= *channels;
-					}
-				}
-				break;
-			}
-			// Interleaved 32bit formats
-			case mlt_audio_s32le:
-			case mlt_audio_f32le:
-			{
-				int32_t tmp;
-				for ( c = 0; c < *channels; c++ )
-				{
-					// Pointer to first sample
-					int32_t *a = (int32_t*)*buffer + c;
-					// Pointer to last sample
-					int32_t *b = (int32_t*)*buffer + ((*samples - 1)* *channels) + c;
-					while( a < b )
-					{
-						tmp = *a;
-						*a = *b;
-						*b = tmp;
-						a += *channels;
-						b -= *channels;
-					}
-				}
-				break;
-			}
-			// Non-Interleaved 32bit formats
-			case mlt_audio_s32:
-			case mlt_audio_float:
-			{
-				int32_t tmp;
-				for ( c = 0; c < *channels; c++ )
-				{
-					// Pointer to first sample
-					int32_t *a = (int32_t*)*buffer + (c * *samples);
-					// Pointer to last sample
-					int32_t *b = (int32_t*)*buffer + ((c + 1) * *samples) - 1;
-					while( a < b )
-					{
-						tmp = *a;
-						*a = *b;
-						*b = tmp;
-						a++;
-						b--;
-					}
-				}
-				break;
-			}
-			case mlt_audio_none:
-				break;
-			default:
-				mlt_log_error( MLT_PRODUCER_SERVICE(producer),
-						"Unknown Audio Format %s\n",
-						mlt_audio_format_name( *format ) );
-				break;
-		}
+		mlt_audio_reverse( &audio );
 	}
+
+	mlt_audio_get_values( &audio, buffer, frequency, format, samples, channels );
 
 	return error;
 }
@@ -233,6 +145,9 @@ static int producer_get_frame( mlt_producer producer, mlt_frame_ptr frame, int i
 		{
 			clip_position = mlt_properties_get_int( producer_properties, "out" ) - clip_position;
 		}
+		if (!mlt_properties_get_int(producer_properties, "ignore_points")) {
+			clip_position += mlt_producer_get_in(producer);
+		}
 		mlt_producer_seek( pdata->clip_producer, clip_position );
 
 		// Get the frame from the clip producer
@@ -243,6 +158,20 @@ static int producer_get_frame( mlt_producer producer, mlt_frame_ptr frame, int i
 		{
 			mlt_frame_push_audio( *frame, producer );
 			mlt_frame_push_audio( *frame, producer_get_audio );
+
+			// Pitch compensation does not work well for speed *reduction* of 1/10th or less.
+			if ( mlt_properties_get_int( producer_properties, "warp_pitch" ) && fabs(pdata->speed) >= 0.1 )
+			{
+				if ( !pdata->pitch_filter )
+				{
+					pdata->pitch_filter = mlt_factory_filter( mlt_service_profile( MLT_PRODUCER_SERVICE(producer)), "rbpitch", NULL );
+				}
+				if ( pdata->pitch_filter )
+				{
+					mlt_properties_set_double( MLT_FILTER_PROPERTIES(pdata->pitch_filter), "pitchscale", 1.0 / fabs(pdata->speed) );
+					mlt_filter_process( pdata->pitch_filter, *frame );
+				}
+			}
 		}
 	}
 	else
@@ -268,6 +197,7 @@ static void producer_close( mlt_producer producer )
 		mlt_producer_close( pdata->clip_producer );
 		mlt_profile_close( pdata->clip_profile );
 		mlt_properties_close( pdata->clip_parameters );
+		mlt_filter_close( pdata->pitch_filter );
 		free( pdata );
 	}
 
@@ -285,6 +215,7 @@ mlt_producer producer_timewarp_init( mlt_profile profile, mlt_service_type type,
 
 	if ( arg && producer && pdata )
 	{
+		double frame_rate_num_scaled;
 		mlt_properties producer_properties = MLT_PRODUCER_PROPERTIES( producer );
 
 		// Initialize the producer
@@ -310,6 +241,7 @@ mlt_producer producer_timewarp_init( mlt_profile profile, mlt_service_type type,
 		pdata->clip_profile = NULL;
 		pdata->clip_parameters = NULL;
 		pdata->clip_producer = NULL;
+		pdata->pitch_filter = NULL;
 
 		// Create a false profile to be used by the clip producer.
 		pdata->clip_profile = mlt_profile_clone( mlt_service_profile( MLT_PRODUCER_SERVICE( producer ) ) );
@@ -321,7 +253,17 @@ mlt_producer producer_timewarp_init( mlt_profile profile, mlt_service_type type,
 			pdata->clip_profile->frame_rate_num *= 1000;
 			pdata->clip_profile->frame_rate_den *= 1000;
 		}
-		pdata->clip_profile->frame_rate_num = (double)pdata->clip_profile->frame_rate_num / fabs(pdata->speed);
+		frame_rate_num_scaled = (double)pdata->clip_profile->frame_rate_num / fabs(pdata->speed);
+		if (frame_rate_num_scaled > INT_MAX) // Check for overflow in case speed < 1.0
+		{
+			//scale by denominator to avoid overflow.
+			pdata->clip_profile->frame_rate_den = (double)pdata->clip_profile->frame_rate_den * fabs(pdata->speed);
+		}
+		else
+		{
+			//scale by numerator
+			pdata->clip_profile->frame_rate_num = frame_rate_num_scaled;
+		}
 
 		// Create a producer for the clip using the false profile.
 		pdata->clip_producer = mlt_factory_producer( pdata->clip_profile, "abnormal", resource );
@@ -339,7 +281,7 @@ mlt_producer producer_timewarp_init( mlt_profile profile, mlt_service_type type,
 			// they can be passed between the clip producer and this producer.
 			pdata->clip_parameters = mlt_properties_new();
 			mlt_repository repository = mlt_factory_repository();
-			mlt_properties clip_metadata = mlt_repository_metadata( repository, producer_type, mlt_properties_get( clip_properties, "mlt_service" ) );
+			mlt_properties clip_metadata = mlt_repository_metadata( repository, mlt_service_producer_type, mlt_properties_get( clip_properties, "mlt_service" ) );
 			if ( clip_metadata )
 			{
 				mlt_properties params = (mlt_properties) mlt_properties_get_data( clip_metadata, "parameters", NULL );

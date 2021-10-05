@@ -1,24 +1,28 @@
-set(melt_lib mlt Threads::Threads)
-find_package(SDL2 QUIET)
-if(SDL2_FOUND)
-    add_library(sdl2 SHARED IMPORTED GLOBAL)
-    set_target_properties(sdl2 PROPERTIES
-        INTERFACE_INCLUDE_DIRECTORIES ${SDL2_INCLUDE_DIRS}
-        IMPORTED_LOCATION ${libdir}/libSDL2.so
-    )
-else()
-    pkg_check_modules(sdl2 IMPORTED_TARGET GLOBAL sdl2)
-    if(TARGET PkgConfig::sdl2)
-        add_library(sdl2 ALIAS PkgConfig::sdl2)
-    endif()
-endif()
-if(TARGET sdl2)
-    if(MINGW)
-        list(APPEND melt_lib mingw32)
-    endif()
-    list(APPEND melt_lib sdl2)
-endif()
 add_executable(melt melt.c io.c)
+
+target_compile_options(melt PRIVATE ${MLT_COMPILE_OPTIONS})
+
+target_link_libraries(melt PRIVATE mlt Threads::Threads)
+
 target_compile_definitions(melt PRIVATE VERSION="${MLT_VERSION}")
-target_link_libraries(melt ${melt_lib})
-install(TARGETS melt RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+if(TARGET PkgConfig::sdl2)
+    target_link_libraries(melt PRIVATE PkgConfig::sdl2)
+    target_compile_definitions(melt PRIVATE HAVE_SDL2)
+    if(MINGW)
+        target_link_libraries(melt PRIVATE mingw32)
+    endif()
+endif()
+
+if(MINGW)
+  target_link_options(melt PRIVATE -mconsole)
+endif()
+
+if(WIN32 OR APPLE)
+  install(TARGETS melt RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+else()
+  install(PROGRAMS "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/melt" DESTINATION ${CMAKE_INSTALL_BINDIR} RENAME melt-${MLT_VERSION_MAJOR})
+  install(CODE "execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink melt-${MLT_VERSION_MAJOR} melt \
+                                WORKING_DIRECTORY \$ENV\{DESTDIR\}${CMAKE_INSTALL_FULL_BINDIR})"
+  )
+endif()

@@ -1,7 +1,6 @@
 /*
  * producer_count.c -- counting producer
- * Copyright (C) 2013 Brian Matherly
- * Author: Brian Matherly <pez4brian@yahoo.com>
+ * Copyright (C) 2013 Meltytech, LLC
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -134,7 +133,7 @@ static int producer_get_audio( mlt_frame frame, int16_t** buffer, mlt_audio_form
 	*format = mlt_audio_float;
 	*frequency = *frequency <= 0 ? 48000 : *frequency;
 	*channels = *channels <= 0 ? 2 : *channels;
-	*samples = *samples <= 0 ? mlt_sample_calculator( fps, *frequency, position ) : *samples;
+	*samples = *samples <= 0 ? mlt_audio_calculate_frame_samples( fps, *frequency, position ) : *samples;
 
 	// Allocate the buffer
 	size = *samples * *channels * sizeof( float );
@@ -477,7 +476,7 @@ static void add_clock_to_frame( mlt_producer producer, mlt_frame frame, time_inf
 	mlt_profile profile = mlt_service_profile( MLT_PRODUCER_SERVICE( producer ) );
 	mlt_properties producer_properties = MLT_PRODUCER_PROPERTIES( producer );
 	uint8_t* image = NULL;
-	mlt_image_format format = mlt_image_rgb24a;
+	mlt_image_format format = mlt_image_rgba;
 	int size = 0;
 	int width = profile->width;
 	int height = profile->height;

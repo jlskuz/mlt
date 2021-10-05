@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2019 Meltytech, LLC
+ * Copyright (C) 2011-2021 Meltytech, LLC
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -157,9 +157,9 @@ static void attach_normalisers( mlt_profile profile, mlt_service service )
 	create_filter( profile, service, "audioconvert", &created );
 }
 
-static void on_frame_show( void *dummy, mlt_properties properties, mlt_frame frame )
+static void on_frame_show( void *dummy, mlt_properties properties, mlt_event_data event_data )
 {
-	mlt_events_fire( properties, "consumer-frame-show", frame, NULL );
+	mlt_events_fire( properties, "consumer-frame-show", event_data );
 }
 
 static mlt_consumer generate_consumer( mlt_consumer consumer, mlt_properties props, int index )
@@ -367,7 +367,7 @@ static void foreach_consumer_put( mlt_consumer consumer, mlt_frame frame )
 			mlt_audio_format format = mlt_audio_s16;
 			int channels = mlt_properties_get_int( properties, "channels" );
 			int frequency = mlt_properties_get_int( properties, "frequency" );
-			int current_samples = mlt_sample_calculator( self_fps, frequency, self_pos );
+			int current_samples = mlt_audio_calculate_frame_samples( self_fps, frequency, self_pos );
 			mlt_frame_get_audio( frame, (void**) &buffer, &format, &frequency, &channels, &current_samples );
 			int current_size = mlt_audio_format_size( format, current_samples, channels );
 
@@ -391,7 +391,7 @@ static void foreach_consumer_put( mlt_consumer consumer, mlt_frame frame )
 				int deeply = index > 1 ? 1 : 0;
 				mlt_frame clone_frame = mlt_frame_clone( frame, deeply );
 				mlt_properties clone_props = MLT_FRAME_PROPERTIES( clone_frame );
-				int nested_samples = mlt_sample_calculator( nested_fps, frequency, nested_pos );
+				int nested_samples = mlt_audio_calculate_frame_samples( nested_fps, frequency, nested_pos );
 				// -10 is an optimization to avoid tiny amounts of leftover samples
 				nested_samples = nested_samples > current_samples - 10 ? current_samples : nested_samples;
 				int nested_size = mlt_audio_format_size( format, nested_samples, channels );

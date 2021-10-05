@@ -1,6 +1,6 @@
 /*
  * producer_loader.c -- auto-load producer by file name extension
- * Copyright (C) 2003-2014 Meltytech, LLC
+ * Copyright (C) 2003-2021 Meltytech, LLC
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -107,8 +107,8 @@ static mlt_producer create_producer( mlt_profile profile, char *file )
 
 		// Chop off the query string
 		p = strrchr( lookup, '?' );
-		if ( p )
-			p[0] = '\0';
+		if ( p && p > lookup && p[-1] == '\\' )
+			p[-1] = '\0';
 
 		// Strip file:// prefix
 		p = lookup;
@@ -161,19 +161,47 @@ static mlt_producer create_producer( mlt_profile profile, char *file )
 
 static void create_filter( mlt_profile profile, mlt_producer producer, char *effect, int *created )
 {
-	mlt_filter filter;
+	mlt_filter filter = NULL;
+	int i = 0;
+	int exists = 0;
 	char *id = strdup( effect );
 	char *arg = strchr( id, ':' );
 	if ( arg != NULL )
 		*arg ++ = '\0';
 
-	filter = mlt_factory_filter( profile, id, arg );
-	if ( filter )
+	for ( i = 0; ( filter = mlt_service_filter( MLT_PRODUCER_SERVICE(producer), i ) ) != NULL; i ++ )
 	{
-		mlt_properties_set_int( MLT_FILTER_PROPERTIES( filter ), "_loader", 1 );
-		mlt_producer_attach( producer, filter );
-		mlt_filter_close( filter );
-		*created = 1;
+		// Check if this filter already exists
+		char* filter_id = mlt_properties_get( MLT_FILTER_PROPERTIES(filter), "mlt_service");
+		if ( filter_id && strcmp( id, filter_id ) == 0 )
+		{
+			exists = 1;
+			*created = 1;
+			break;
+		}
+		else if ( mlt_properties_get_int( MLT_FILTER_PROPERTIES( filter ), "_loader") == 0 )
+		{
+			// Stop at the first non-loader filter. This will be the insertion point for the new filter.
+			break;
+		}
+	}
+
+	if ( !exists )
+	{
+		filter = mlt_factory_filter( profile, id, arg );
+		if ( filter )
+		{
+			mlt_properties_set_int( MLT_FILTER_PROPERTIES( filter ), "_loader", 1 );
+			mlt_producer_attach( producer, filter );
+			int last_filter_index = mlt_service_filter_count( MLT_PRODUCER_SERVICE(producer) ) - 1;
+			if ( i != last_filter_index )
+			{
+				// Move the filter to be before any non-loader filters;
+				mlt_service_move_filter( MLT_PRODUCER_SERVICE(producer), last_filter_index, i );
+			}
+			mlt_filter_close( filter );
+			*created = 1;
+		}
 	}
 	free( id );
 }
@@ -230,7 +258,7 @@ mlt_producer producer_loader_init( mlt_profile profile, mlt_service_type type, c
 		mlt_properties_get( properties, "loader_normalised" ) == NULL )
 		attach_normalisers( profile, producer );
 	
-	if ( producer )
+	if ( producer && mlt_service_identify( MLT_PRODUCER_SERVICE( producer ) ) != mlt_service_chain_type )
 	{
 		// Always let the image and audio be converted
 		int created = 0;
