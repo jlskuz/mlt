@@ -1,6 +1,6 @@
 /*
  * producer_colour.c
- * Copyright (C) 2003-2019 Meltytech, LLC
+ * Copyright (C) 2003-2020 Meltytech, LLC
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -91,16 +91,16 @@ static int producer_get_image( mlt_frame frame, uint8_t **buffer, mlt_image_form
 		*format = mlt_image_format_id( mlt_properties_get( producer_props, "mlt_image_format") );
 
 	// Choose suitable out values if nothing specific requested
-	if ( *format == mlt_image_none || *format == mlt_image_glsl )
-		*format = mlt_image_rgb24a;
+	if ( *format == mlt_image_none || *format == mlt_image_movit )
+		*format = mlt_image_rgba;
 	if ( *width <= 0 )
 		*width = mlt_service_profile( MLT_PRODUCER_SERVICE(producer) )->width;
 	if ( *height <= 0 )
 		*height = mlt_service_profile( MLT_PRODUCER_SERVICE(producer) )->height;
 	
 	// Choose default image format if specific request is unsupported
-	if (*format!=mlt_image_yuv420p  && *format!=mlt_image_yuv422  && *format!=mlt_image_rgb24 && *format!= mlt_image_glsl && *format!= mlt_image_glsl_texture)
-		*format = mlt_image_rgb24a;
+	if (*format!=mlt_image_yuv420p  && *format!=mlt_image_yuv422  && *format!=mlt_image_rgb && *format!= mlt_image_movit && *format!= mlt_image_opengl_texture)
+		*format = mlt_image_rgba;
 
 	// See if we need to regenerate
 	if ( !now || ( then && strcmp( now, then ) ) || *width != current_width || *height != current_height || *format != current_format )
@@ -163,7 +163,7 @@ static int producer_get_image( mlt_frame frame, uint8_t **buffer, mlt_image_form
 			mlt_properties_set_int( properties, "colorspace", 601 );
 			break;
 		}
-		case mlt_image_rgb24:
+		case mlt_image_rgb:
 			while ( --i )
 			{
 				*p ++ = color.r;
@@ -171,11 +171,11 @@ static int producer_get_image( mlt_frame frame, uint8_t **buffer, mlt_image_form
 				*p ++ = color.b;
 			}
 			break;
-		case mlt_image_glsl:
-		case mlt_image_glsl_texture:
+		case mlt_image_movit:
+		case mlt_image_opengl_texture:
 			memset(p, 0, size);
 			break;
-		case mlt_image_rgb24a:
+		case mlt_image_rgba:
 			while ( --i )
 			{
 				*p ++ = color.r;
@@ -199,7 +199,7 @@ static int producer_get_image( mlt_frame frame, uint8_t **buffer, mlt_image_form
 	uint8_t *alpha = NULL;
 
 	// Initialise the alpha
-	if (color.a < 255 || *format == mlt_image_rgb24a) {
+	if (color.a < 255 || *format == mlt_image_rgba) {
 		alpha_size = *width * *height;
 		alpha = mlt_pool_alloc( alpha_size );
 		if ( alpha )
@@ -255,6 +255,10 @@ static int producer_get_frame( mlt_producer producer, mlt_frame_ptr frame, int i
 		// Push the get_image method
 		mlt_frame_push_service( *frame, producer );
 		mlt_frame_push_get_image( *frame, producer_get_image );
+
+		// A hint to scalers and affine transition that this producer does not
+		// benefit from interpolation.
+		mlt_properties_set_int(properties, "interpolation_not_required", 1);
 	}
 
 	// Calculate the next timecode

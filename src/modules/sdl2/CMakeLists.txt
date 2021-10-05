@@ -1,10 +1,16 @@
-if(TARGET sdl2)
-    file(GLOB mltsdl2_src *.c)
-    add_library(mltsdl2 MODULE ${mltsdl2_src})
-    target_link_libraries(mltsdl2 mlt m Threads::Threads sdl2)
-    # Create module in parent directory, for the benefit of "source setenv".
-    set_target_properties(mltsdl2 PROPERTIES LIBRARY_OUTPUT_DIRECTORY ..)
-    install(TARGETS mltsdl2 LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/mlt)
-    file(GLOB yml *.yml)
-    install(FILES ${yml} DESTINATION ${CMAKE_INSTALL_DATADIR}/mlt/sdl2)
-endif()
+add_library(mltsdl2 MODULE
+  common.c
+  consumer_sdl2_audio.c
+  consumer_sdl2.c
+  factory.c
+)
+
+target_compile_options(mltsdl2 PRIVATE ${MLT_COMPILE_OPTIONS})
+
+target_link_libraries(mltsdl2 PRIVATE mlt m Threads::Threads PkgConfig::sdl2)
+
+set_target_properties(mltsdl2 PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${MLT_MODULE_OUTPUT_DIRECTORY}")
+
+install(TARGETS mltsdl2 LIBRARY DESTINATION ${MLT_INSTALL_MODULE_DIR})
+
+install(FILES consumer_sdl2_audio.yml consumer_sdl2.yml DESTINATION ${MLT_INSTALL_DATA_DIR}/sdl2)

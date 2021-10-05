@@ -1,6 +1,6 @@
 /*
  * transition_affine.c -- affine transformations
- * Copyright (C) 2003-2020 Meltytech, LLC
+ * Copyright (C) 2003-2021 Meltytech, LLC
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -28,6 +28,8 @@
 #include <float.h>
 
 #include "interp.h"
+
+#define MLT_AFFINE_MAX_DIMENSION (16000)
 
 static double alignment_parse( char* align )
 {
@@ -74,83 +76,6 @@ static double anim_get_angle(mlt_properties properties, const char* name, mlt_po
 			result *= 360;
 	}
 	return result;
-}
-
-/** Calculate real geometry.
-*/
-
-static void geometry_calculate( mlt_transition transition, const char *store, struct mlt_geometry_item_s *output, double position )
-{
-	mlt_properties properties = MLT_TRANSITION_PROPERTIES( transition );
-	mlt_geometry geometry = mlt_properties_get_data( properties, store, NULL );
-	int mirror_off = mlt_properties_get_int( properties, "mirror_off" );
-	int repeat_off = mlt_properties_get_int( properties, "repeat_off" );
-	int length = mlt_geometry_get_length( geometry );
-
-	// Allow wrapping
-	if ( !repeat_off && position >= length && length != 0 )
-	{
-		int section = position / length;
-		position -= section * length;
-		if ( !mirror_off && section % 2 == 1 )
-			position = length - position;
-	}
-
-	// Fetch the key for the position
-	mlt_geometry_fetch( geometry, output, position );
-}
-
-
-static mlt_geometry transition_parse_keys( mlt_transition transition, const char *name, const char *store, int normalised_width, int normalised_height )
-{
-	// Get the properties of the transition
-	mlt_properties properties = MLT_TRANSITION_PROPERTIES( transition );
-
-	// Try to fetch it first
-	mlt_geometry geometry = mlt_properties_get_data( properties, store, NULL );
-
-	// Determine length and obtain cycle
-	mlt_position length = mlt_transition_get_length( transition );
-	double cycle = mlt_properties_get_double( properties, "cycle" );
-
-	// Allow a geometry repeat cycle
-	if ( cycle >= 1 )
-		length = cycle;
-	else if ( cycle > 0 )
-		length *= cycle;
-
-	if ( geometry == NULL )
-	{
-		// Get the new style geometry string
-		char *property = mlt_properties_get( properties, name );
-
-		// Create an empty geometries object
-		geometry = mlt_geometry_init( );
-
-		// Parse the geometry if we have one
-		mlt_geometry_parse( geometry, property, length, normalised_width, normalised_height );
-
-		// Store it
-		mlt_properties_set_data( properties, store, geometry, 0, ( mlt_destructor )mlt_geometry_close, NULL );
-	}
-	else
-	{
-		// Check for updates and refresh if necessary
-		mlt_geometry_refresh( geometry, mlt_properties_get( properties, name ), length, normalised_width, normalised_height );
-	}
-
-	return geometry;
-}
-
-static mlt_geometry composite_calculate( mlt_transition transition, struct mlt_geometry_item_s *result, int nw, int nh, double position )
-{
-	// Structures for geometry
-	mlt_geometry start = transition_parse_keys( transition, "geometry", "geometries", nw, nh );
-
-	// Do the calculation
-	geometry_calculate( transition, "geometries", result, position );
-
-	return start;
 }
 
 typedef struct
@@ -445,7 +370,7 @@ static int transition_get_image( mlt_frame a_frame, uint8_t **image, mlt_image_f
 
 	// Image, format, width, height and image for the b frame
 	uint8_t *b_image = NULL;
-	mlt_image_format b_format = mlt_image_rgb24a;
+	mlt_image_format b_format = mlt_image_rgba;
 	int b_width = mlt_properties_get_int( b_props, "meta.media.width" );
 	int b_height = mlt_properties_get_int( b_props, "meta.media.height" );
 	double b_ar = mlt_frame_get_aspect_ratio( b_frame );
@@ -483,7 +408,7 @@ static int transition_get_image( mlt_frame a_frame, uint8_t **image, mlt_image_f
 	}
 	
 	// Fetch the a frame image
-	*format = mlt_image_rgb24a;
+	*format = mlt_image_rgba;
 	int error = mlt_frame_get_image( a_frame, image, format, width, height, 1 );
 	if (error || !image)
 		return error;
@@ -495,18 +420,7 @@ static int transition_get_image( mlt_frame a_frame, uint8_t **image, mlt_image_f
 
 	mlt_service_lock( MLT_TRANSITION_SERVICE( transition ) );
 
-	if (mlt_properties_get(properties, "geometry"))
-	{
-		// Structures for geometry
-		struct mlt_geometry_item_s geometry;
-		composite_calculate( transition, &geometry, normalised_width, normalised_height, ( double )position );
-		result.x = geometry.x;
-		result.y = geometry.y;
-		result.w = geometry.w;
-		result.h = geometry.h;
-		result.o = geometry.mix / 100.0f;
-	}
-	else if (mlt_properties_get(properties, "rect"))
+	if (mlt_properties_get(properties, "rect"))
 	{
 		// Determine length and obtain cycle
 		double cycle = mlt_properties_get_double( properties, "cycle" );
@@ -540,8 +454,10 @@ static int transition_get_image( mlt_frame a_frame, uint8_t **image, mlt_image_f
 
 	double geometry_w = result.w;
 	double geometry_h = result.h;
+	int fill = mlt_properties_get_int( properties, "fill" );
+	int distort = mlt_properties_get_int( properties, "distort" );
 
-	if ( !mlt_properties_get_int( properties, "fill" ) )
+	if ( !fill )
 	{
 		double geometry_dar = result.w * consumer_ar / result.h;
 
@@ -558,21 +474,35 @@ static int transition_get_image( mlt_frame a_frame, uint8_t **image, mlt_image_f
 	}
 
 	// Fetch the b frame image
-	if (mlt_properties_get_int(properties, "b_scaled") || mlt_properties_get_int(b_props, "always_scale")) {
-		// Request b frame image size just what is needed.
-		b_width = result.w;
-		b_height = result.h;
+	if (scale_width != 1.0 || scale_height != 1.0) {
+			// Scale request of b frame image to consumer scale maintaining its aspect ratio.
+			b_height = CLAMP(*height, 1, MLT_AFFINE_MAX_DIMENSION);
+			b_width  = MAX(b_height * b_dar / b_ar, 1);
+			if (b_width > MLT_AFFINE_MAX_DIMENSION) {
+				b_width  = CLAMP(*width, 1, MLT_AFFINE_MAX_DIMENSION);
+				b_height = MAX(b_width * b_ar / b_dar, 1);
+			}
+			// Set the rescale interpolation to match the frame
+			mlt_properties_set( b_props, "rescale.interp", mlt_properties_get( a_props, "rescale.interp" ) );
+			// Disable padding (resize filter)
+			mlt_properties_set_int( b_props, "distort", 1 );
+	} else if (mlt_properties_get_int(b_props, "always_scale") || (!mlt_properties_get_int(b_props, "interpolation_not_required")
+			  && (fill || distort || b_width > result.w || b_height > result.h || mlt_properties_get_int(properties, "b_scaled")))) {
+		// Request b frame image scaled to what is needed.
+		b_height = CLAMP(result.h, 1, MLT_AFFINE_MAX_DIMENSION);
+		b_width  = MAX(b_height * b_dar / b_ar, 1);
+		if (b_width > MLT_AFFINE_MAX_DIMENSION) {
+			b_width  = CLAMP(result.w, 1, MLT_AFFINE_MAX_DIMENSION);
+			b_height = MAX(b_width * b_ar / b_dar, 1);
+		}
 		// Set the rescale interpolation to match the frame
 		mlt_properties_set( b_props, "rescale.interp", mlt_properties_get( a_props, "rescale.interp" ) );
-	} else if (scale_width != 1.0 || scale_height != 1.0) {
-		// Scale request of b frame image to consumer scale maintaining its aspect ratio.
-		b_height = *height;
-		b_width = b_height * b_dar / b_ar;
-		// Set the rescale interpolation to match the frame
-		mlt_properties_set( b_props, "rescale.interp", mlt_properties_get( a_props, "rescale.interp" ) );
+		// Disable padding (resize filter)
 		mlt_properties_set_int( b_props, "distort", 1 );
 	} else {
-		// Request full resolution of b frame image.
+		// Request at resolution of b frame image. This only happens when not using fill or distort mode
+		// and the image is smaller than the rect with the intention to prevent scaling of the
+		// image and merely position and possibly transform.
 		mlt_properties_set_int( b_props, "rescale_width", b_width );
 		mlt_properties_set_int( b_props, "rescale_height", b_height );
 
@@ -587,6 +517,7 @@ static int transition_get_image( mlt_frame a_frame, uint8_t **image, mlt_image_f
 			mlt_properties_set( b_props, "rescale.interp", "none" );
 		}
 	}
+	mlt_log_debug(MLT_TRANSITION_SERVICE(transition), "requesting image B at resolution %dx%d\n", b_width, b_height);
 
 	// This is not a field-aware transform.
 	mlt_properties_set_int( b_props, "consumer_deinterlace", 1 );
@@ -601,7 +532,7 @@ static int transition_get_image( mlt_frame a_frame, uint8_t **image, mlt_image_f
 	}
 
 	// Check that both images are of the correct format and process
-	if ( *format == mlt_image_rgb24a && b_format == mlt_image_rgb24a )
+	if ( *format == mlt_image_rgba && b_format == mlt_image_rgba )
 	{
 		double sw, sh;
 		// Get values from the transition
@@ -658,7 +589,7 @@ static int transition_get_image( mlt_frame a_frame, uint8_t **image, mlt_image_f
 		}
 
 		// Factor scaling into the transformation based on output resolution.
-		if ( mlt_properties_get_int( properties, "distort" ) )
+		if ( distort )
 		{
 			scale_x = geom_scale_x * ( scale_x == 0 ? 1 : scale_x );
 			scale_y = geom_scale_y * ( scale_y == 0 ? 1 : scale_y );

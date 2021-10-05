@@ -1,6 +1,6 @@
 /*
  * consumer_rtaudio.c -- output through RtAudio audio wrapper
- * Copyright (C) 2011-2020 Meltytech, LLC
+ * Copyright (C) 2011-2021 Meltytech, LLC
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -28,7 +28,7 @@
 #include <RtAudio.h>
 #endif
 
-static void consumer_refresh_cb( mlt_consumer sdl, mlt_consumer consumer, char *name );
+static void consumer_refresh_cb(mlt_consumer sdl, mlt_consumer consumer, mlt_event_data );
 static int  rtaudio_callback( void *outputBuffer, void *inputBuffer,
 	unsigned int nFrames, double streamTime, RtAudioStreamStatus status, void *userData );
 static void *consumer_thread_proxy( void *arg );
@@ -441,7 +441,7 @@ public:
 				while ( running && speed != 0 && mlt_deque_count( queue ) > 15 )
 					nanosleep( &tm, NULL );
 
-				// Push this frame to the back of the queue
+				// Push this frame to the back of the video queue
 				if ( running && speed )
 				{
 					pthread_mutex_lock( &video_mutex );
@@ -486,7 +486,7 @@ public:
 	//					mlt_consumer_purge( consumer );
 	//				last_position = mlt_frame_get_position( frame );
 				}
-				else
+				else if (speed == 0.0)
 				{
 					mlt_consumer_purge( getConsumer() );
 	//				last_position = -1;
@@ -665,8 +665,9 @@ public:
 	{
 		// Get the properties of this consumer
 		mlt_properties properties = MLT_CONSUMER_PROPERTIES( getConsumer() );
-		if ( running && !mlt_consumer_is_stopped( getConsumer() ) )
-			mlt_events_fire( properties, "consumer-frame-show", frame, NULL );
+		if ( running && !mlt_consumer_is_stopped( getConsumer() ) ) {
+			mlt_events_fire( properties, "consumer-frame-show", mlt_event_data_from_frame(frame) );
+		}
 
 		return 0;
 	}
@@ -760,9 +761,10 @@ public:
 
 };
 
-static void consumer_refresh_cb( mlt_consumer sdl, mlt_consumer consumer, char *name )
+static void consumer_refresh_cb( mlt_consumer sdl, mlt_consumer consumer, mlt_event_data event_data )
 {
-	if ( !strcmp( name, "refresh" ) )
+	const char *name = mlt_event_data_to_string(event_data);
+	if ( name && !strcmp( name, "refresh" ) )
 	{
 		RtAudioConsumer* rtaudio = (RtAudioConsumer*) consumer->child;
 		pthread_mutex_lock( &rtaudio->refresh_mutex );
@@ -885,8 +887,8 @@ static mlt_properties metadata( mlt_service_type type, const char *id, void *dat
 
 MLT_REPOSITORY
 {
-	MLT_REGISTER( consumer_type, "rtaudio", consumer_rtaudio_init );
-	MLT_REGISTER_METADATA( consumer_type, "rtaudio", metadata, NULL );
+	MLT_REGISTER( mlt_service_consumer_type, "rtaudio", consumer_rtaudio_init );
+	MLT_REGISTER_METADATA( mlt_service_consumer_type, "rtaudio", metadata, NULL );
 }
 
 } // extern C

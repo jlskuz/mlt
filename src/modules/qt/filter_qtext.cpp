@@ -1,6 +1,6 @@
 /*
  * filter_qtext.cpp -- text overlay filter
- * Copyright (c) 2018-2020 Meltytech, LLC
+ * Copyright (c) 2018-2021 Meltytech, LLC
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -23,6 +23,12 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QString>
+#include <QFile>
+#include <QTextDocument>
+#include <QTextCodec>
+#include <QMutexLocker>
+
+static QMutex g_mutex;
 
 static QRectF get_text_path( QPainterPath* qpath, mlt_properties filter_properties, const char* text, double scale )
 {
@@ -222,6 +228,49 @@ static void paint_text( QPainter* painter, QPainterPath* qpath, mlt_properties f
 	painter->drawPath( *qpath );
 }
 
+static void close_qtextdoc(void* p)
+{
+	delete static_cast<QTextDocument*>(p);
+}
+
+static QTextDocument* get_rich_text(mlt_properties properties, double width, double height)
+{
+	QTextDocument* doc = (QTextDocument*) mlt_properties_get_data(properties, "QTextDocument", NULL);
+	auto html = QString::fromUtf8(mlt_properties_get(properties, "html"));
+	auto prevHtml = QString::fromUtf8(mlt_properties_get(properties, "_html"));
+	auto resource = QString::fromUtf8(mlt_properties_get(properties, "resource"));
+	auto prevResource = QString::fromUtf8(mlt_properties_get(properties, "_resource"));
+	auto prevWidth = mlt_properties_get_double(properties, "_width");
+	auto prevHeight = mlt_properties_get_double(properties, "_height");
+	bool changed = !doc || qAbs(width - prevWidth) > 1 || qAbs(height- prevHeight) > 1;
+
+	if (!resource.isEmpty() && (changed || resource != prevResource)) {
+		QFile file(resource);
+		if (file.open(QFile::ReadOnly)) {
+			QByteArray data = file.readAll();
+			QTextCodec *codec = QTextCodec::codecForHtml(data);
+			doc = new QTextDocument;
+			doc->setPageSize(QSizeF(width, height));
+			doc->setHtml(codec->toUnicode(data));
+			mlt_properties_set_data(properties, "QTextDocument", doc, 0, (mlt_destructor) close_qtextdoc, NULL);
+			mlt_properties_set(properties, "_resource", resource.toUtf8().constData());
+			mlt_properties_set_double(properties, "_width", width);
+			mlt_properties_set_double(properties, "_height", height);
+		}
+	} else if (!html.isEmpty() && (changed || html != prevHtml)) {
+//		fprintf(stderr, "%s\n", html.toUtf8().constData());
+		doc = new QTextDocument;
+		doc->setPageSize(QSizeF(width, height));
+		doc->setHtml(html);
+		mlt_properties_set_data(properties, "QTextDocument", doc, 0, (mlt_destructor) close_qtextdoc, NULL);
+		mlt_properties_set(properties, "_html", html.toUtf8().constData());
+		mlt_properties_set_double(properties, "_width", width);
+		mlt_properties_set_double(properties, "_height", height);
+	}
+
+	return doc;
+}
+
 static mlt_properties get_filter_properties( mlt_filter filter, mlt_frame frame )
 {
 	mlt_properties properties = mlt_frame_get_unique_properties( frame, MLT_FILTER_SERVICE(filter) );
@@ -239,6 +288,8 @@ static int filter_get_image( mlt_frame frame, uint8_t **image, mlt_image_format 
 	mlt_profile profile = mlt_service_profile(MLT_FILTER_SERVICE(filter));
 	mlt_position position = mlt_filter_get_position( filter, frame );
 	mlt_position length = mlt_filter_get_length2( filter, frame );
+	bool isRichText = qstrlen(mlt_properties_get(filter_properties, "html")) > 0 ||
+					  qstrlen(mlt_properties_get(filter_properties, "resource")) > 0;
 	QString geom_str = QString::fromLatin1( mlt_properties_get( filter_properties, "geometry" ) );
 	if( geom_str.isEmpty() )
 	{
@@ -249,13 +300,15 @@ static int filter_get_image( mlt_frame frame, uint8_t **image, mlt_image_format 
 	mlt_rect rect = mlt_properties_anim_get_rect( filter_properties, "geometry", position, length );
 
 	// Get the current image
-	*image_format = mlt_image_rgb24a;
+	*image_format = mlt_image_rgba;
 	mlt_properties_set_int( MLT_FRAME_PROPERTIES(frame), "resize_alpha", 255 );
+	mlt_service_lock(MLT_FILTER_SERVICE(filter));
 	error = mlt_frame_get_image( frame, image, image_format, width, height, writable );
 
 	if( !error )
 	{
 		double scale = mlt_profile_scale_width(profile, *width);
+		double scale_height = mlt_profile_scale_height(profile, *height);
 		if ( geom_str.contains('%') )
 		{
 			rect.x *= *width;
@@ -265,27 +318,50 @@ static int filter_get_image( mlt_frame frame, uint8_t **image, mlt_image_format 
 		}
 		else
 		{
-			double scale_height = mlt_profile_scale_height(profile, *height);
 			rect.x *= scale;
 			rect.y *= scale_height;
 			rect.w *= scale;
 			rect.h *= scale_height;
 		}
 
-		QImage qimg( *width, *height, QImage::Format_ARGB32 );
+		QImage qimg;
 		convert_mlt_to_qimage_rgba( *image, &qimg, *width, *height );
 
 		QPainterPath text_path;
-		QRectF path_rect = get_text_path( &text_path, filter_properties, argument, scale );
+#ifdef Q_OS_WIN
+		auto pixel_ratio = mlt_properties_get_double(filter_properties, "pixel_ratio");
+#else
+		auto pixel_ratio = 1.0;
+#endif
+		QRectF path_rect(0, 0, rect.w / scale * pixel_ratio, rect.h / scale_height * pixel_ratio);
 		QPainter painter( &qimg );
 		painter.setRenderHints( QPainter::Antialiasing | QPainter::TextAntialiasing | QPainter::HighQualityAntialiasing );
-		transform_painter( &painter, rect, path_rect, filter_properties, profile );
-		paint_background( &painter, path_rect, filter_properties );
-		paint_text( &painter, &text_path, filter_properties );
+		if (isRichText) {
+			auto overflowY = mlt_properties_exists(filter_properties, "overflow-y")?
+				!!mlt_properties_get_int(filter_properties, "overflow-y") :
+				(path_rect.height() >= profile->height * pixel_ratio);
+			auto drawRect = overflowY? QRectF() : path_rect;
+			QMutexLocker mutexLock(&g_mutex);
+			auto doc = get_rich_text(filter_properties, path_rect.width(), std::numeric_limits<qreal>::max());
+			if (doc) {
+				transform_painter(&painter, rect, path_rect, filter_properties, profile);
+				if (overflowY) {
+					path_rect.setHeight(qMax(path_rect.height(), doc->size().height()));
+				}
+				paint_background(&painter, path_rect, filter_properties);
+				doc->drawContents(&painter, drawRect);
+			}
+		} else {
+			path_rect = get_text_path(&text_path, filter_properties, argument, scale);
+			transform_painter(&painter, rect, path_rect, filter_properties, profile);
+			paint_background(&painter, path_rect, filter_properties);
+			paint_text(&painter, &text_path, filter_properties);
+		}
 		painter.end();
 
 		convert_qimage_to_mlt_rgba( &qimg, *image, *width, *height );
 	}
+	mlt_service_unlock(MLT_FILTER_SERVICE(filter));
 	free( argument );
 
 	return error;
@@ -297,13 +373,26 @@ static int filter_get_image( mlt_frame frame, uint8_t **image, mlt_image_format 
 static mlt_frame filter_process( mlt_filter filter, mlt_frame frame )
 {
 	mlt_properties properties = get_filter_properties( filter, frame );
-	char* argument = mlt_properties_get( properties, "argument" );
-	if ( !argument || !strcmp( "", argument ) )
+
+	if (mlt_properties_get_int(properties, "_hide")) {
 		return frame;
+	}
+
+	char* argument = mlt_properties_get(properties, "argument");
+	char* html = mlt_properties_get(properties, "html");
+	char* resource = mlt_properties_get(properties, "resource");
 
 	// Save the text to be used by get_image() to support parallel processing
 	// when this filter is encapsulated by other filters.
-	mlt_frame_push_service( frame, strdup( argument ) );
+	if (qstrlen(resource)) {
+		mlt_frame_push_service(frame, NULL);
+	} else if (qstrlen(html)) {
+		mlt_frame_push_service(frame, NULL);
+	} else if (qstrlen(argument)) {
+		mlt_frame_push_service(frame, strdup(argument));
+	} else {
+		return frame;
+	}
 
 	// Push the filter on to the stack
 	mlt_frame_push_service( frame, filter );
@@ -347,6 +436,7 @@ mlt_filter filter_qtext_init( mlt_profile profile, mlt_service_type type, const 
 	mlt_properties_set_string( filter_properties, "halign", "left" );
 	mlt_properties_set_string( filter_properties, "valign", "top" );
 	mlt_properties_set_string( filter_properties, "outline", "0" );
+	mlt_properties_set_double( filter_properties, "pixel_ratio", 1.0 );
 	mlt_properties_set_int( filter_properties, "_filter_private", 1 );
 
 	return filter;

@@ -1,6 +1,345 @@
 MLT Release Notes
 -----------------
 
+Version 7.0.1
+
+This version is just build fixes for the most immediate problems with the
+somewhat new but exclusive build system in v7.
+
+* Fixed docker image not working.
+* Fixed a system-installed build cannot finds its modules and data.
+* Fixed the python installation path for binaries.
+* Added support for the `DESTDIR` environment variable when creating melt symlink.
+* Increased the build constant for the maximum size of a line of a properties file.
+* Fixed the vid.stab metadata install path.
+
+
+Version 7.0.0
+
+This is a major new version that breaks API to add a major new feature to the
+framework: retiming. This is accomplished through new classes `mlt_chain` and
+`mlt_link`. And since we are breaking API we decided to clean house by
+removing deprecations and switching the build system over entirely to CMake.
+For more information see our
+[migration guide](https://mltframework.org/docs/v7migration/).
+
+Framework
+  * Added `mlt_chain` and `Mlt::Chain` classes.
+  * Added `mlt_link` and `Mlt::Link` classes.
+  * Added a `link` value to service `type` in the service metadata schema.
+  * Added a boolean `animation` parameter attribute to the service metadata schema.
+  * Added `mlt_animation_shift_frame()` and `Mlt::Animation::shift_frames()`.
+  * Added `mlt_animation_get_string()`.
+  * Fixed using a stale cached property animation string.
+  * Added `mlt_image` and `Mlt::Image` classes.
+  * Remove legacy "height + 1" workaround in image allocation.
+  * Fixed a crash on setting `timewarp` speed higher than 23x.
+  * Added `mlt_audio_silence()`.
+  * Removed `mlt_image_opengl`.
+  * Replaced variadic arguments in `mlt_events` with new `mlt_event_data` APIs.
+  * Removed `mlt_geometry` APIs.
+  * Renamed `mlt_image_rgb24a` as `mlt_image_rgba`.
+  * Renamed `mlt_image_rgb24` to `mlt_image_rgb`.
+  * Renamed `mlt_image_glsl` to `mlt_image_movit`.
+  * Renamed `mlt_image_glsl_texture` to `mlt_image_opengl_texture`.
+  * Removed virtual function `mlt_frame::get_alpha_mask()`.
+  * Removed `mlt_frame_get_alpha_mask()`.
+  * Removed deprecated functions:
+    - `mlt_sample_calculator`
+    - `mlt_sample_calculator_to_now`
+    - `mlt_channel_layout_name`
+    - `mlt_channel_layout_id`
+    - `mlt_channel_layout_channels`
+    - `mlt_channel_layout_default`
+    - `mlt_slices_init`
+    - `mlt_slices_close`
+    - `mlt_slices_run`
+    - `mlt_playlist_move_region`
+    - `Mlt::Playlist::move_region`
+  * Fixed a rounding error calculating display aspect ratio in `mlt_profile_from_producer()`.
+
+Modules
+  * Added a `timeremap` link to the core module with animatable `map` property.
+    (Speed can increase or decrease between keyframes including reverse.)
+  * Added `chain` and `link` XML elements to `xml` module.
+  * Added "meta.media.has_b_frames" property to `avformat` producer.
+  * Removed deprecated modules:
+    - `dv`
+    - `gtk2` (not gdk)
+    - `kino`
+    - `linsys`
+    - `lumas`
+    - `motion_est`
+    - `swfdec`
+    - `videostab`
+  * Removed the following services:
+    - `data_feed` filter
+    - `data_show` filter
+    - `region` filter and transition
+    - `sdl_image`
+  * Converted filters to use new `mlt_image` class:
+    - `brightness`
+    - `imageconver`
+    - `mirror`
+    - `spot_remover`
+  * Deprecated the `audiowave` filter.
+  * Added the ability to build the `jackrack` module without JACK to get only
+    LADSPA producers and filters.
+  * Deprecated `start` and `end` properties for the following filters:
+    - `brightness`
+    - `panner`
+    - `boxblur`
+    - `wave`
+    - `volume`
+  * Removed deprecated `font` property from `pango` producer.
+  * Improved album art (attached pic) detection in `avformat` producer.
+  * Improved the `resample` filter to have less artifacts and use less memory.
+
+Other
+  * CMake: nearly complete rewrite.
+  * Removed the old configure bash scripts and Makefiles.
+  * Added `-chain` and `-link` options to `melt` command line.
+
+
+Version 6.26.1
+
+This version fixes a major regression in the avformat producer to read from
+network URLs.
+
+
+Version 6.26.0
+
+This is the last planned release of major version 6. Version 7 will be released
+soon and introduce some minor API breakage while removing deprecations.
+The main new feature in this version is hardware-accellerated decoding!
+However, this is a basic implementation: It always returns the uncompressed
+video to the CPU memory with no pipelining to filters. Even when coupled with
+hardware encoding in the avformat consumer it must transfer the video. Also,
+there is no automatic software/CPU fallback and no resource management.
+
+Modules
+  * Added support for `hwaccel` query string parameter to the `avformat`
+    producer. It accepts the following values:
+    vaapi (Linux/BSD), cuda (Linux), videotoolbox (macOS), d3d11va (Windows), dxva2 (Windows)
+  * Added support for `hwaccel_device` query string parameter to the `avformat`
+    producer. This is only used with vaapi (device path) and cuda, d3d11va, or
+    dxva (number).
+  * Improved the usage of image slice threading in `frei0r`. This only applies
+    when `threads`=0 and only works with some frei0r plugins that you must decide
+    yourself.
+  * Added an ellipse item to `kdenlivetitle` producer.
+  * Added support for PNG and GIF as album art in the `avformat` producer.
+  * Added BT.2020 color space metadata to the `avformat` producer.
+  * Resolved many FFmpeg deprecations in the `avformat` producer making it possible to support AV1 decoding.
+  * Added a `strobe` fitler that periodically makes the alpha channel transparent.
+  * Added a new `typewriter` text filter (currently only works with the
+    kdenlivetitle producer).
+  * Improved sound quality for lower pitch shifts in `rbpitch`.
+  * Fixed speed of trick play in the `jack`, `rtaudio`, `sdl_audio`, and `sdl2_audio` consumers.
+  * Fixed matrix for independent channels in `swresample` filter.
+  * Fixed leading zeros for the `timer` filter.
+  * Fixed flickering using `affine` with a `luma` transition.
+  * Fixed a crash using RGBA images in the `qimage` producer (regression in v6.22.0).
+  * Fixed `brightness` filter misbehaves on `alpha` > 1.
+  * Fixed writing `flac` format file does not set its duration in the `avformat` consumer.
+  * Fixed an infinite loop in `rbpitch` filter.
+  * Fixed `ttl` in the `qimage` producer.
+  * Fixed building with OpenCV 4.5
+  * Fixed artifacts with multiple HTML `qtext` filters and frame threading.
+  * Deprecated the `start` and `end` properties on the following (use property
+    animation instead):
+    - brightness
+    - panner
+    - boxblur
+    - wave
+    - volume
+  * Deprecated the following services:
+    - data_show
+    - region
+    - transition filter
+    - autotrack_rectangle
+    - motion_est
+    - slowmotion
+
+Other
+  * CMake:
+    - Fixed building without SWIG.
+    - Added many "MOD_..." options to explictly disable modules.
+    - Added src/tests and the option `BUILD_TESTING`, which defaults off.
+    - All dependency checks moved to top level CMakeLists.txt.
+    - Install melt man page.
+    - Install oldfilm SVG files.
+    - Added src/examples.
+    - Install framework/metaschema.yaml.
+    - Fixed `plusgpl` datadir.
+    - Added all swwig/ languages.
+    - Increased C++ standard to C++14.
+  * Added an `AV1` encoding preset.
+  * Improved documentation of the requirement for C11.
+  * The minimum version of FFmpeg is v4.0 and Libav is no longer supported.
+
+
+Version 6.24.0
+
+This version is mostly fixes plus a few new filters.
+
+Framework
+  * Trigger a `property-changed` event on `mlt_properties_pass_list`.
+  * Fixed using a video transition with a video clip on an audio track.
+  * Reduce the amount of service caching to 2X #tracks to reduce memory usage.
+
+Modules
+  * Added the `pillar_echo` filter to the plus module.
+  * Added a `qtcrop` filter to the qt module.
+  * Added `html`, `resource`, `overflow-y`, and `_hide` properties to the `qtext` filter for rich text.
+  * Added the filter `choppy` to the core module.
+  * Added slice threading to the `brightness` filter.
+  * Fixed compiling with OpenCV 4.
+  * Fixed the colors when using `mlt_image_format=rgb24a` with `avformat` consumer.
+  * Fixed using WebVfx in a Docker container.
+  * Fixed a possible crash in the `timewarp` producer on sources with non-integer frame rates.
+  * Fixed a regression in version 6.22 with multiple affine filters at the same time.
+  * Fixed possible abort or deadlock on recursive pthread mutexes in `avformat` producer.
+  * Fixed a crash in `crop` filter with large `center_bias` value when `use_profile` is 1.
+  * Fixed a white video frame appearing on threaded rendering in `freeze` filter.
+  * Fixed MLT XML DRD to permit empty playlists, which may occur on empty tracks in a multitrack.
+  * Fixed initializing QApplication in the `qimage` producer.
+  * Fixed interpolation when scaling with the `affine` rect and geomety properties.
+  * Fixed high memory usage with high factors of pitch shifting in the `rbpitch` filter.
+  * Fixed a crash on files with more than 32 streams in the `avformat` producer.
+
+Other
+  * Fixed CMake build on MSYS2 and Windows Craft.
+  * Added the Python binding to the CMake build.
+  * Added the `sdl` (v1) module to the CMake build.
+  * Removed minrate and maxrate from the `webm` avformat consumer preset.
+
+
+Version 6.22.1 - July 30, 2020
+
+This patch version only fixes the version reported in the CMake build.
+
+
+Version 6.22.0 - July 30, 2020
+
+This version fixes bugs associated with the preview scaling introduced in the
+previous version.
+
+Framework
+  * Added mlt_properties_exists() and Mlt::Properties::property_exists().
+  * Added mlt_audio C class with:
+    - mlt_audio_new()
+	- mlt_audio_close()
+	- mlt_audio_set_values()
+	- mlt_audio_get_values()
+	- mlt_audio_alloc_data()
+	- mlt_audio_calculate_size()
+	- mlt_audio_plane_count()
+	- mlt_audio_plane_size()
+	- mlt_audio_get_planes()
+	- mlt_audio_shrink()
+	- mlt_audio_reverse()
+	- mlt_audio_copy()
+	- mlt_audio_calculate_frame_samples()
+	- mlt_audio_calculate_samples_to_position()
+	- mlt_audio_channel_layout_name()
+	- mlt_audio_channel_layout_id()
+	- mlt_audio_channel_layout_channels()
+	- mlt_audio_channel_layout_default()
+  * Added Mlt::Audio C++ class with:
+    - Mlt::Audio::Audio()
+	- Mlt::Audio::Audio(mlt_audio_s*)
+	- Mlt::Audio::~Audio()
+	- Mlt::Audio::data()
+	- Mlt::Audio::set_data(void*)
+	- Mlt::Audio::frequency()
+	- Mlt::Audio::set_frequency(int)
+	- Mlt::Audio::format()
+	- Mlt::Audio::set_format(mlt_audio_format)
+	- Mlt::Audio::samples()
+	- Mlt::Audio::set_samples(int)
+	- Mlt::Audio::channels()
+	- Mlt::Audio::set_channels(int)
+	- Mlt::Audio::layout()
+	- Mlt::Audio::set_layout(mlt_channel_layout)
+  * Fixed drop-frame timecode for 59.94 fps.
+  * Fixed crash on null pointer passed to mlt_consumer_stop().
+
+Modules
+  * Fixed frei0r transitions with preview scaling.
+  * Fixed affine ox and oy properties incorrect with preview scaling.
+  * Fixed a crash and incorrect preview scaling with more than one affine
+    filter active on the same frame.
+  * Fixed preview scaling for the rotoscoping filter.
+  * Added the sample_fmt property to the avformat consumer.
+  * Fixed a possible segfault in the mix transition.
+  * Removed support for text keyframes to the text and qtext filters
+    to fix regression on strings containing '='.
+  * Disable frame-threading with bigsh0t, distort0r, and medians frei0r plugins.
+  * Added "meta.media.%d.stream.projection" property the avformat producer.
+  * Fixed a crash with with filters not supporting preview scale in frei0r
+    transitions.
+  * Fix artifacts in luma transition and affine filter with frame-threading.
+  * Stop including 'title="Anonymous Submission"' in xml consumer.
+  * Fixed a crash in opencv.tracker filter.
+  * Fixed a crash in composite transition if luma file fails to load.
+  * Added validations in opengl module to prevent asserts in Movit.
+  * Fixed building with OpenCV 4.
+  * Moved some services from gtk2 module to new gdk module:
+    - gtkrescale filter
+	- pango producer
+	- pixbuf producer
+  * Deprecated the gtk2 module and no longer enabled by default.
+  * Changed avformat producer to accept a '?' in argument/resource property
+    by escaping it as '\?'.
+  * Changed the background property of the affine filter to be mutable.
+  * Deprecated the linsys (DVEO SDI) module.
+  * Fixed changing the audio_index property in the avformat producer.
+  * Changed resample filter to more resiliant to frequency changes.
+  * Added a video_delay property to the sdl2_audio and rtaudio consumers.
+  * Add millisecond options to the timer filter.
+  * Fixed the in point handling for the timewarp producer.
+  * Fixed some audio gaps and sync issues with the rbpitch filter and timewarp
+    pitch compensation.
+  * Fixed a possible crash caused by producer consumer.
+  * Changed avformat consumer to set AVOption color_primaries based on the
+    MLT colorspace if not already set as property.
+  * Fixed crop right on image with odd width skews image in crop filter.
+  * Fixed incorrect silence value for unsigned 8-bit audio in avformat producer.
+  * Changed qimage to use Qt's internal orientation detection instead of libexif.
+  * Reduced clicks in mix transition by silencing buffers on discontinuity.
+  * Improved A/V synchronization in (sw)resample filters - also reduces audio clicks.
+  * Improved speed of the qimage producer.
+  * Fixed incorrect color using libx264rgb in avformat consumer.
+  * Fixed relative paths for avfilters that have the "filename" option.
+  * Fixed some avfilters dropping the alpha channel: smartblur, vaguedenoiser.
+  * Improved performance of the resize filter.
+  * Fixed an affine filter inside a transition was always nearest neighbor
+    interpolation.
+  * Changed the lift_gamma_gain filter to use round values up.
+
+Other
+  * Fixed melt option "-group" applies to an implicit consumer.
+  * Added "-quiet" option to melt (implies -silent but more so).
+  * CMake build improvments adding modules:
+    - gdk
+	- jackrack
+	- lumas
+	- resample
+	- sox
+	- vorbis
+  * Added avformat consumer presets:
+    - Slide-Deck-H264
+	- Slide-Deck-HEVC
+  * Removed intra=1 from some avformat presets (use g=1 for intra only):
+    - intermediate/MPEG-2
+	- intermediate/MPEG-4
+	- lossless/H.264
+  * Fixed using Qt, Movit, and WebVfx in the official docker image:
+    https://hub.docker.com/repository/docker/mltframework/melt
+	IMPORTANT: it now requires `docker run` with the `--init` option.
+
+
 Version 6.20.0 - February 15, 2020
 
 This version adds support for low resolution preview scaling and adds a

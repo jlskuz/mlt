@@ -1,4 +1,4 @@
-FROM ubuntu:18.04 AS base
+FROM ubuntu:20.04 AS base
 
 ENV DEBIAN_FRONTEND noninteractive
 ENV HOME /tmp
@@ -13,14 +13,15 @@ RUN apt-get install -yqq wget git automake autoconf libtool intltool g++ yasm na
   libsox-dev libsdl2-dev libgtk2.0-dev libsoup2.4-dev \
   qt5-default libqt5webkit5-dev libqt5svg5-dev \
   libexif-dev libtheora-dev libvorbis-dev python3-dev cmake xutils-dev \
-  libegl1-mesa-dev libeigen3-dev libfftw3-dev libvdpau-dev
+  libegl1-mesa-dev libeigen3-dev libfftw3-dev libvdpau-dev meson ninja-build
 
 # Get and run the build script
 RUN wget --quiet -O /tmp/build-melt.sh https://raw.githubusercontent.com/mltframework/mlt-scripts/master/build/build-melt.sh && \
   echo "INSTALL_DIR=\"/usr/local\"" > /tmp/build-melt.conf && \
   echo "SOURCE_DIR=\"/tmp/melt\"" >> /tmp/build-melt.conf && \
   echo "AUTO_APPEND_DATE=0" >> /tmp/build-melt.conf && \
-  echo "ENABLE_WEBVFX=1" >> /tmp/build-melt.conf && \
+  echo "FFMPEG_HEAD=0" >> /tmp/build-melt.conf && \
+  echo "FFMPEG_REVISION=origin/release/4.4" >> /tmp/build-melt.conf && \
   bash /tmp/build-melt.sh -c /tmp/build-melt.conf
 
 
@@ -36,17 +37,20 @@ RUN apt-get install -yqq libsamplerate0 libxml2 libjack0 \
   # Additional runtime libs \
   libgavl1 libsox3 libexif12 xvfb libxkbcommon-x11-0 libhyphen0 libwebp6 \
   # LADSPA plugins \
-  amb-plugins ambdec autotalent blepvco blop bs2b-ladspa calf-ladspa caps cmt \
+  amb-plugins ambdec autotalent blepvco blop bs2b-ladspa caps cmt \
   csladspa fil-plugins guitarix-ladspa invada-studio-plugins-ladspa mcp-plugins \
   omins rev-plugins ste-plugins swh-plugins tap-plugins vco-plugins wah-plugins \
+  lsp-plugins-ladspa dpf-plugins-ladspa \
   # Fonts \
-  fonts-liberation 'ttf-adf-.+'
+  fonts-liberation 'ttf-.+'
 
 # Install the build
 COPY --from=build /usr/local/ /usr/local/
+
+WORKDIR /mnt
+ENV LD_LIBRARY_PATH /usr/local/lib
 
 # Qt, Movit, and WebVfx require xvfb-run
 # IMPORTANT: xvfb-run requires docker run option "--init"
 # https://docs.docker.com/engine/reference/commandline/run/
 ENTRYPOINT ["/usr/bin/xvfb-run", "-a", "/usr/local/bin/melt"]
-WORKDIR /mnt

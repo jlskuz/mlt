@@ -1,7 +1,6 @@
 /*
  * filter_audiowaveform.cpp -- audio waveform visualization filter
- * Copyright (c) 2015-2020 Meltytech, LLC
- * Author: Brian Matherly <code@brianmatherly.com>
+ * Copyright (c) 2015-2021 Meltytech, LLC
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -69,9 +68,10 @@ static void destory_save_buffer( void* ptr )
 	free( buff );
 }
 
-static void property_changed( mlt_service owner, mlt_filter filter, char *name )
+static void property_changed( mlt_service owner, mlt_filter filter, mlt_event_data event_data )
 {
-	if ( !strcmp( name, "window" ) )
+	const char *name = mlt_event_data_to_string(event_data);
+	if ( name && !strcmp( name, "window" ) )
 	{
 		private_data* pdata = (private_data*)filter->child;
 		pdata->reset_window = 1;
@@ -340,7 +340,7 @@ static int filter_get_image( mlt_frame frame, uint8_t **image, mlt_image_format 
 	if( audio )
 	{
 		// Get the current image
-		*image_format = mlt_image_rgb24a;
+		*image_format = mlt_image_rgba;
 		error = mlt_frame_get_image( frame, image, image_format, width, height, writable );
 
 		// Draw the waveforms
@@ -371,8 +371,7 @@ static mlt_frame filter_process( mlt_filter filter, mlt_frame frame )
 	if( mlt_frame_is_test_card( frame ) ) {
 		// The producer does not generate video. This filter will create an
 		// image on the producer's behalf.
-		mlt_profile profile = mlt_service_profile(
-			MLT_PRODUCER_SERVICE( mlt_frame_get_original_producer( frame ) ) );
+		mlt_profile profile = mlt_service_profile( MLT_FILTER_SERVICE( filter ) );
 		mlt_properties_set_int( frame_properties, "progressive", 1 );
 		mlt_properties_set_double( frame_properties, "aspect_ratio", mlt_profile_sar( profile ) );
 		mlt_properties_set_int( frame_properties, "meta.media.width", profile->width );

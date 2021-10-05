@@ -21,11 +21,28 @@
 #include <opencv2/tracking.hpp>
 #include <opencv2/core/version.hpp>
 
+#define CV_VERSION_INT (CV_VERSION_MAJOR << 16 | CV_VERSION_MINOR << 8 | CV_VERSION_REVISION)
+
+#if CV_VERSION_INT > 0x040502
+#include <opencv2/tracking/tracking_legacy.hpp>
+#include <sys/types.h> // for stat()
+#include <sys/stat.h>  // for stat()
+#include <unistd.h>    // for stat()
+#endif
+
 
 typedef struct
 {
 	cv::Ptr<cv::Tracker> tracker;
+#if CV_VERSION_INT > 0x040502
+	cv::Ptr<cv::legacy::tracking::Tracker> legacyTracker;
+#endif
+
+#if CV_VERSION_INT < 0x040500
 	cv::Rect2d boundingBox;
+#else
+	cv::Rect boundingBox;
+#endif
 	char * algo;
 	mlt_rect startRect;
 	bool initialized;
@@ -36,14 +53,17 @@ typedef struct
 	int analyse_height;
 	mlt_position producer_in;
 	mlt_position producer_length;
+	bool legacyTracking;
 } private_data;
 
 
-static void property_changed( mlt_service owner, mlt_filter filter, char *name )
+static void property_changed( mlt_service owner, mlt_filter filter, mlt_event_data event_data )
 {
 	private_data* pdata = (private_data*)filter->child;
 	mlt_properties filter_properties = MLT_FILTER_PROPERTIES( filter );
-	if ( !strcmp( name, "results" ) )
+	const char *name = mlt_event_data_to_string(event_data);
+
+	if ( name && !strcmp( name, "results" ) )
 	{
 		mlt_properties_anim_get_int( filter_properties, "results", 0, -1 );
 		mlt_animation anim = mlt_properties_get_animation( filter_properties, "results" );
@@ -55,7 +75,7 @@ static void property_changed( mlt_service owner, mlt_filter filter, char *name )
 			return;
 		}
 		else
-                {
+		{
 			// Analysis data was discarded
 			pdata->initialized = false;
 			pdata->producer_length = 0;
@@ -89,13 +109,17 @@ static void property_changed( mlt_service owner, mlt_filter filter, char *name )
 	else if ( !strcmp( name, "_reset" ) )
 	{
 		mlt_properties_set( filter_properties, "results", NULL );
+		mlt_properties_set( filter_properties, "_results", NULL );
+		pdata->initialized = false;
+		pdata->playback = false;
+
 	}
 }
 
 static void apply( mlt_filter filter, private_data* data, int width, int height, int position, int length )
 {
 	mlt_properties properties = MLT_FILTER_PROPERTIES( filter );
-	mlt_rect rect = mlt_properties_anim_get_rect( properties, "results", position, length );
+	mlt_rect rect = mlt_properties_anim_get_rect( properties, "results", position, -1 );
 	mlt_profile profile = mlt_service_profile( MLT_FILTER_SERVICE( filter ) );
 	// Calculate the region now
 	double scale_width = mlt_profile_scale_width( profile, width );
@@ -114,7 +138,6 @@ static void apply( mlt_filter filter, private_data* data, int width, int height,
 static void analyze( mlt_filter filter, cv::Mat cvFrame, private_data* data, int width, int height, int position, int length )
 {
 	mlt_properties filter_properties = MLT_FILTER_PROPERTIES( filter );
-
 	if ( data->analyse_width == -1 )
 	{
 		// Store analyze width/height
@@ -132,13 +155,71 @@ static void analyze( mlt_filter filter, cv::Mat cvFrame, private_data* data, int
 	if (!data->initialized)
 	{
 		// Build tracker
+		data->tracker.reset();
+#if CV_VERSION_INT > 0x040502
+		data->legacyTracker.reset();
+#endif
+		data->legacyTracking = false;
 		data->algo = mlt_properties_get( filter_properties, "algo" );
 #if CV_VERSION_MAJOR > 3 || (CV_VERSION_MAJOR == 3 && CV_VERSION_MINOR >= 3)
 		if ( !data->algo || *data->algo == '\0' || !strcmp(data->algo, "KCF" ) )
 		{
 			data->tracker = cv::TrackerKCF::create();
 		}
-#if CV_VERSION_MAJOR > 3 || (CV_VERSION_MAJOR == 3 && CV_VERSION_MINOR >= 4 && CV_VERSION_REVISION >= 2)
+		else if ( !strcmp(data->algo, "MIL" ) )
+		{
+			data->tracker = cv::TrackerMIL::create();
+		}
+#if CV_VERSION_INT > 0x040502
+		else if ( !strcmp(data->algo, "DaSIAM" ) )
+		{
+				if (mlt_properties_exists( filter_properties, "modelsfolder" ) ) {
+						char *modelsdir = mlt_properties_get( filter_properties, "modelsfolder" );
+						cv::TrackerDaSiamRPN::Params parameters;
+						char *model1 = (char *)calloc( 1, 1000 );
+						char *model2 = (char *)calloc( 1, 1000 );
+						char *model3 = (char *)calloc( 1, 1000 );
+						strcat( model1, modelsdir );
+						strcat( model2, modelsdir );
+						strcat( model3, modelsdir );
+						strcat( model1, "/dasiamrpn_model.onnx" );
+						strcat( model2, "/dasiamrpn_kernel_cls1.onnx" );
+						strcat( model3, "/dasiamrpn_kernel_r1.onnx" );
+						struct stat file_info;
+						if ( stat( model1, &file_info ) == 0 && stat( model2, &file_info ) == 0 && stat( model3, &file_info ) == 0 )
+						{
+								// Models found, process
+								parameters.model = model1;
+								parameters.kernel_cls1 = model2;
+								parameters.kernel_r1 = model3;
+								data->tracker = cv::TrackerDaSiamRPN::create(parameters);
+						}
+						else
+						{
+								fprintf( stderr, "DaSIAM models not found, please provide a modelsfolder parameter\n" );
+						}
+						free( model1 );
+						free( model2 );
+						free( model3 );
+				}
+		}
+		else if ( !strcmp(data->algo, "MOSSE" ) )
+		{
+			data->legacyTracking = true;
+			data->legacyTracker = cv::legacy::tracking::TrackerMOSSE::create();
+		}
+		else if ( !strcmp(data->algo, "MEDIANFLOW" ) )
+		{
+			data->legacyTracking = true;
+			data->legacyTracker = cv::legacy::tracking::TrackerMedianFlow::create();
+		}
+		else if ( !strcmp(data->algo, "CSRT" ) )
+		{
+			data->legacyTracking = true;
+			data->legacyTracker = cv::legacy::tracking::TrackerCSRT::create();
+		}
+#endif
+#if CV_VERSION_INT >= 0x030402 && CV_VERSION_INT < 0x040500
 		else if ( !strcmp(data->algo, "CSRT" ) )
 		{
 			data->tracker = cv::TrackerCSRT::create();
@@ -148,10 +229,7 @@ static void analyze( mlt_filter filter, cv::Mat cvFrame, private_data* data, int
 			data->tracker = cv::TrackerMOSSE::create();
 		}
 #endif
-		else if ( !strcmp(data->algo, "MIL" ) )
-		{
-			data->tracker = cv::TrackerMIL::create();
-		}
+#if CV_VERSION_INT >= 0x030402 && CV_VERSION_INT < 0x040500
 		else if ( !strcmp(data->algo, "TLD" ) )
 		{
 			data->tracker = cv::TrackerTLD::create();
@@ -160,6 +238,7 @@ static void analyze( mlt_filter filter, cv::Mat cvFrame, private_data* data, int
 		{
 			data->tracker = cv::TrackerBoosting::create();
 		}
+#endif // CV_VERSION_INT >= 0x030402 && CV_VERSION_INT < 0x040500
 #else
 		if ( data->algo == NULL || !strcmp(data->algo, "" ) )
 		{
@@ -172,9 +251,13 @@ static void analyze( mlt_filter filter, cv::Mat cvFrame, private_data* data, int
 #endif
 
 		// Discard previous results
-		mlt_properties_set( filter_properties, "_results", "" );
+#if CV_VERSION_INT > 0x040502
+		if( data->tracker == NULL &&  data->legacyTracker == NULL )
+		{
+#else
 		if( data->tracker == NULL )
 		{
+#endif
 			fprintf( stderr, "Tracker initialized FAILED\n" );
 		}
 		else
@@ -224,13 +307,27 @@ static void analyze( mlt_filter filter, cv::Mat cvFrame, private_data* data, int
 			if ( data->boundingBox.height <1 ) {
 				data->boundingBox.height = 50;
 			}
+#if CV_VERSION_INT >= 0x030402 && CV_VERSION_INT < 0x040500
 			if ( data->tracker->init( cvFrame, data->boundingBox ) ) {
+#else
+			{
+				if ( data->legacyTracking )
+				{
+#if CV_VERSION_INT > 0x040502
+						data->legacyTracker->init( cvFrame, data->boundingBox );
+#endif
+				}
+				else
+				{
+						data->tracker->init( cvFrame, data->boundingBox );
+				}
+#endif
 				data->initialized = true;
 				data->analyze = true;
 				data->last_position = position - 1;
 			}
 			// init anim property
-			mlt_properties_anim_get_int( filter_properties, "_results", 0, length );
+			mlt_properties_anim_get_int( filter_properties, "_results", 0, -1 );
 			mlt_animation anim = mlt_properties_get_animation( filter_properties, "_results" );
 			if ( anim == NULL ) {
 				fprintf( stderr, "animation initialized FAILED\n" );
@@ -239,7 +336,18 @@ static void analyze( mlt_filter filter, cv::Mat cvFrame, private_data* data, int
 	}
 	else
 	{
-		data->tracker->update( cvFrame, data->boundingBox );
+		if ( data->legacyTracking )
+		{
+#if CV_VERSION_INT > 0x040502
+				cv::Rect2d rect( data->boundingBox );
+				data->legacyTracker->update( cvFrame, rect );
+				data->boundingBox = cv::Rect( rect );
+#endif
+		}
+		else
+		{
+				data->tracker->update( cvFrame, data->boundingBox );
+		}
 	}
 	if( data->analyze && position != data->last_position + 1 )
 	{
@@ -259,16 +367,16 @@ static void analyze( mlt_filter filter, cv::Mat cvFrame, private_data* data, int
 	rect.o = 0;
 
 	int steps = mlt_properties_get_int(filter_properties, "steps");
-	if ( steps > 1 && position > 0 && position < length - 1 )
+	if ( steps > 1 && position > 0 && position < data->producer_length - 1 )
 	{
 		if ( position % steps == 0 )
-			mlt_properties_anim_set_rect( filter_properties, "_results", rect, position, length, mlt_keyframe_smooth );
+			mlt_properties_anim_set_rect( filter_properties, "_results", rect, position + data->producer_in, length, mlt_keyframe_smooth );
 	}
 	else
 	{
-		mlt_properties_anim_set_rect( filter_properties, "_results", rect, position, length, mlt_keyframe_smooth );
+		mlt_properties_anim_set_rect( filter_properties, "_results", rect, position + data->producer_in, length, mlt_keyframe_smooth );
 	}
-	if ( position + 1 == length )
+	if ( position + 1 == data->producer_length )
 	{
 		//Analysis finished, store results
 		mlt_animation anim = mlt_properties_get_animation( filter_properties, "_results");
@@ -298,25 +406,28 @@ static int filter_get_image( mlt_frame frame, uint8_t **image, mlt_image_format 
 	private_data* data = (private_data*) filter->child;
 	if ( shape_width == 0 && blur == 0 && !data->playback ) {
 		error = mlt_frame_get_image( frame, image, format, width, height, 1 );
+		mlt_service_unlock( MLT_FILTER_SERVICE( filter ) );
+		return error;
 	}
 	else
 	{
-		*format = mlt_image_rgb24;
+		*format = mlt_image_rgb;
 		error = mlt_frame_get_image( frame, image, format, width, height, 1 );
 		cvFrame = cv::Mat( *height, *width, CV_8UC3, *image );
 	}
 	if ( data->producer_length == 0 )
 	{
 		mlt_producer producer = mlt_frame_get_original_producer( frame );
+		producer = mlt_producer_cut_parent( producer );
 		if ( producer )
 		{
-			data->producer_in = mlt_producer_get_in( producer );
-			data->producer_length = mlt_producer_get_playtime( producer );
+			data->producer_in = mlt_producer_get_in( producer ) + mlt_filter_get_in( filter );
+			data->producer_length = mlt_producer_get_playtime( producer ) - mlt_filter_get_in( filter );
 		}
 	}
 	if ( !data->initialized )
 	{
-		mlt_properties_anim_get_int( filter_properties, "results", 0, data->producer_length );
+		mlt_properties_anim_get_int( filter_properties, "results", 0, -1 );
 		mlt_animation anim = mlt_properties_get_animation( filter_properties, "results" );
 		if ( anim && mlt_animation_key_count(anim) > 0 )
 		{
@@ -366,9 +477,23 @@ static int filter_get_image( mlt_frame frame, uint8_t **image, mlt_image_format 
 			case 1:
 				// Gaussian Blur
 				cv::GaussianBlur( cvFrame( data->boundingBox ), cvFrame( data->boundingBox ), cv::Size( 0, 0 ), blur );
-                                break;
+				break;
+			case 2:
+				// Pixelate
+				if ( data->boundingBox.width > 0 && data->boundingBox.height > 0 )
+				{
+					cv::Mat roi = cvFrame( data->boundingBox );
+					cv::Mat res;
+					cv::resize( roi, res, cv::Size( MAX( 2, data->boundingBox.width / blur ), MAX( 2, data->boundingBox.height / blur )), cv::INTER_NEAREST );
+					cv::resize( res, roi, cv::Size( data->boundingBox.width, data->boundingBox.height ), 0, 0, cv::INTER_NEAREST );
+					cvFrame( data->boundingBox ) = roi;
+				}
+				break;
+			case 3:
+				// Opaque fill, handled in shape_width option
+				shape_width = -1;
+				break;
 			case 0:
-			default:
 				// Median Blur
 				++blur;
 				if ( blur % 2 == 0 )
@@ -377,6 +502,9 @@ static int filter_get_image( mlt_frame frame, uint8_t **image, mlt_image_format 
 					++blur;
 				}
 				cv::medianBlur( cvFrame( data->boundingBox ), cvFrame( data->boundingBox ), blur );
+				break;
+			default:
+				// Do nothing
 				break;
 		}
 	}
