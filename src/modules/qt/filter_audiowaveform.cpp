@@ -460,7 +460,7 @@ mlt_filter filter_audiowaveform_init(mlt_profile profile,
         pdata->reset_window = 1;
         // Create a unique ID for storing data on the frame
         pdata->buffer_prop_name = (char *) calloc(1, 20);
-        snprintf(pdata->buffer_prop_name, 20, "audiowave.%p", filter);
+        snprintf(pdata->buffer_prop_name, 20, "audiowave.%p", (void *)filter);
         pdata->buffer_prop_name[20 - 1] = '\0';
 
         filter->close = filter_close;

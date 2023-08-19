@@ -369,7 +369,7 @@ mlt_filter filter_audiospectrum_init(mlt_profile profile,
 
         // Create a unique ID for storing data on the frame
         pdata->fft_prop_name = (char *) calloc(1, 20);
-        snprintf(pdata->fft_prop_name, 20, "fft.%p", filter);
+        snprintf(pdata->fft_prop_name, 20, "fft.%p", (void *)filter);
         pdata->fft_prop_name[20 - 1] = '\0';
 
         pdata->fft = 0;

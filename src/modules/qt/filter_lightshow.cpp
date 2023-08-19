@@ -317,7 +317,7 @@ mlt_filter filter_lightshow_init(mlt_profile profile,
 
         // Create a unique ID for storing data on the frame
         pdata->mag_prop_name = (char *) calloc(1, 20);
-        snprintf(pdata->mag_prop_name, 20, "fft_mag.%p", filter);
+        snprintf(pdata->mag_prop_name, 20, "fft_mag.%p", (void *)filter);
         pdata->mag_prop_name[20 - 1] = '\0';
 
         pdata->fft = 0;

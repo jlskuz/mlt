@@ -502,7 +502,7 @@ protected:
                       "%s:%d frame=%p, len=%d\n",
                       __FUNCTION__,
                       __LINE__,
-                      frame,
+                      (void *)frame,
                       mlt_deque_count(m_aqueue));
         pthread_mutex_unlock(&m_aqueue_lock);
     }

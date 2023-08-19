@@ -327,8 +327,8 @@ static void finalize_movit_chain(mlt_service leaf_service, mlt_frame frame, mlt_
     if (!chain || new_fingerprint != chain->fingerprint) {
         mlt_log_debug(leaf_service,
                       "=== CREATING NEW CHAIN (old chain=%p, leaf=%p, fingerprint=%s) ===\n",
-                      chain,
-                      leaf_service,
+                      (void *)chain,
+                      (void *)leaf_service,
                       new_fingerprint.c_str());
         mlt_profile profile = mlt_service_profile(leaf_service);
         chain = new GlslChain;

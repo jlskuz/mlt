@@ -80,17 +80,17 @@ void mlt_log(void *service, int level, const char *fmt, ...)
 void mlt_log(void *service, int level, const char *fmt, ...);
 #endif
 
-#define mlt_log_panic(service, format, args...) mlt_log((service), MLT_LOG_PANIC, (format), ##args)
-#define mlt_log_fatal(service, format, args...) mlt_log((service), MLT_LOG_FATAL, (format), ##args)
-#define mlt_log_error(service, format, args...) mlt_log((service), MLT_LOG_ERROR, (format), ##args)
-#define mlt_log_warning(service, format, args...) \
-    mlt_log((service), MLT_LOG_WARNING, (format), ##args)
-#define mlt_log_info(service, format, args...) mlt_log((service), MLT_LOG_INFO, (format), ##args)
-#define mlt_log_verbose(service, format, args...) \
-    mlt_log((service), MLT_LOG_VERBOSE, (format), ##args)
-#define mlt_log_timings(service, format, args...) \
-    mlt_log((service), MLT_LOG_TIMINGS, (format), ##args)
-#define mlt_log_debug(service, format, args...) mlt_log((service), MLT_LOG_DEBUG, (format), ##args)
+#define mlt_log_panic(service, format, ...) mlt_log((service), MLT_LOG_PANIC, (format) __VA_OPT__(,) __VA_ARGS__)
+#define mlt_log_fatal(service, format, ...) mlt_log((service), MLT_LOG_FATAL, (format) __VA_OPT__(,) __VA_ARGS__)
+#define mlt_log_error(service, format, ...) mlt_log((service), MLT_LOG_ERROR, (format) __VA_OPT__(,) __VA_ARGS__)
+#define mlt_log_warning(service, format, ...) \
+    mlt_log((service), MLT_LOG_WARNING, (format) __VA_OPT__(,) __VA_ARGS__)
+#define mlt_log_info(service, format, ...) mlt_log((service), MLT_LOG_INFO, (format) __VA_OPT__(,) __VA_ARGS__)
+#define mlt_log_verbose(service, format, ...) \
+    mlt_log((service), MLT_LOG_VERBOSE, (format) __VA_OPT__(,) __VA_ARGS__)
+#define mlt_log_timings(service, format, ...) \
+    mlt_log((service), MLT_LOG_TIMINGS, (format) __VA_OPT__(,) __VA_ARGS__)
+#define mlt_log_debug(service, format, ...) mlt_log((service), MLT_LOG_DEBUG, (format) __VA_OPT__(,) __VA_ARGS__)
 
 void mlt_vlog(void *service, int level, const char *fmt, va_list);
 int mlt_log_get_level(void);

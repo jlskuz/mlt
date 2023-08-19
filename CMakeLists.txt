@@ -120,7 +120,7 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS ON)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -147,7 +147,7 @@ endif()
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_BUILD_TYPE STREQUAL "Debug")
   # Treat warnings as errors with some exceptions
   set(GCC_FLAGS "-Wall -Werror -Wno-deprecated-declarations")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${GCC_FLAGS} -Wno-class-memaccess -Wno-array-compare -Wno-unused-result -Wno-maybe-uninitialized")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${GCC_FLAGS} -Wno-class-memaccess -Wno-array-compare -Wno-unused-result -Wno-maybe-uninitialized -Wpedantic")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${GCC_FLAGS} -Wno-discarded-qualifiers")
 endif ()
 

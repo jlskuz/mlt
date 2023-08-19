@@ -191,7 +191,7 @@ double get_by_src(mlt_filter filter,
                     get_type,
                     i_gps,
                     subtype,
-                    gps_p);
+                    (void *)gps_p);
     return 0;
 }
 //get_by_src helper shortcuts
