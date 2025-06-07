@@ -17,6 +17,17 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
+#ifdef _MSC_VER
+#define _USE_MATH_DEFINES
+#include <math.h>
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+#ifndef M_PI_2
+#define M_PI_2 1.57079632679489661923
+#endif
+#endif
+
 #include <framework/mlt.h>
 #include <math.h>
 #include <stdio.h>
