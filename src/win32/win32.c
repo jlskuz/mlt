@@ -20,7 +20,9 @@
  */
 
 #include <errno.h> 
-#include <time.h> 
+#include <time.h>
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
 #include <windows.h>
 #include <pthread.h>
 
@@ -32,7 +34,7 @@
 #include "../framework/mlt_properties.h"
 #include "../framework/mlt_log.h"
 
-int usleep(unsigned int useconds)
+/*int usleep(unsigned int useconds)
 {
 	HANDLE timer;
 	LARGE_INTEGER due;
@@ -44,7 +46,7 @@ int usleep(unsigned int useconds)
 	WaitForSingleObject(timer, INFINITE);
 	CloseHandle(timer);
 	return 0;
-}
+} */
 
 
 int nanosleep( const struct timespec * rqtp, struct timespec * rmtp )
