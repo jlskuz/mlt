@@ -827,14 +827,17 @@ static int link_get_audio(mlt_frame frame,
 #endif
             || *samples != pdata->avoutframe->nb_samples
             || *frequency != pdata->avoutframe->sample_rate) {
+
+            int channel_count;
+#if HAVE_FFMPEG_CH_LAYOUT
+            channel_count = pdata->avoutframe->ch_layout.nb_channels;
+#else
+            channel_count = pdata->avoutframe->channels;
+#endif
             mlt_log_error(self,
                           "Unexpected return format c %d->%d\tf %d->%d\tf %d->%d\n",
                           *channels,
-#if HAVE_FFMPEG_CH_LAYOUT
-                          pdata->avoutframe->ch_layout.nb_channels,
-#else
-                          pdata->avoutframe->channels,
-#endif
+                          channel_count,
                           *samples,
                           pdata->avoutframe->nb_samples,
                           *frequency,

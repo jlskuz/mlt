@@ -293,11 +293,13 @@ typedef void *(*mlt_thread_function_t)(void *);      /**< generic thread functio
 #endif
 
 #ifdef _WIN32
-#include <pthread.h>
+//#include <pthread.h>
 /* Win32 compatibility function declarations */
+/*
 #if !defined(__MINGW32__)
 extern int usleep(unsigned int useconds);
 #endif
+*/
 #ifndef WIN_PTHREADS_TIME_H
 extern int nanosleep(const struct timespec *rqtp, struct timespec *rmtp);
 #endif

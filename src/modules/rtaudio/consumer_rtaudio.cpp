@@ -18,6 +18,8 @@
  */
 
 #include <framework/mlt.h>
+// for nanosleep()
+#include <framework/mlt_types.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>

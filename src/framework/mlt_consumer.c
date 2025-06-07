@@ -41,7 +41,7 @@
 
 /** This is not the ideal place for this, but it is needed by VDPAU as well.
  */
-pthread_mutex_t mlt_sdl_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t __declspec(dllexport) mlt_sdl_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /** mlt_frame_s::is_processing can not be made atomic, so protect it with a mutex.
  */

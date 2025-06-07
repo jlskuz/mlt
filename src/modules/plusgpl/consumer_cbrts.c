@@ -266,59 +266,69 @@ static void load_sections(consumer_cbrts self, mlt_properties properties)
 #ifdef si_pid
 #undef si_pid
 #endif
-            char si_pid[len + 1];
 
-            si_name[len - 3 - 5] = 0;
-            strcpy(si_pid, "si.");
-            strcat(si_pid, si_name);
-            strcat(si_pid, ".pid");
+            char *si_pid = malloc(len + 1);
+            if (si_pid) {
+                si_name[len - 3 - 5] = 0;
+                strcpy(si_pid, "si.");
+                strcat(si_pid, si_name);
+                strcat(si_pid, ".pid");
 
-            // Look for si.<name>.pid=<number>
-            if (mlt_properties_get(properties, si_pid)) {
-                char *filename = mlt_properties_get_value(properties, n);
 
-                ts_section *section = load_section(filename);
-                if (section) {
-                    // Determine the periodicity of the section, if supplied
-                    char si_time[len + 1];
+                // Look for si.<name>.pid=<number>
+                if (mlt_properties_get(properties, si_pid)) {
+                    char *filename = mlt_properties_get_value(properties, n);
 
-                    strcpy(si_time, "si.");
-                    strcat(si_time, si_name);
-                    strcat(si_time, ".time");
+                    ts_section *section = load_section(filename);
+                    if (section) {
+                        // Determine the periodicity of the section, if supplied
+                        char *si_time = malloc(len + 1);
+                        if (si_time) {
+                            strcpy(si_time, "si.");
+                            strcat(si_time, si_name);
+                            strcat(si_time, ".time");
 
-                    int time = mlt_properties_get_int(properties, si_time);
-                    if (time == 0)
-                        time = 200;
+                            int time = mlt_properties_get_int(properties, si_time);
+                            if (time == 0)
+                                time = 200;
 
-                    // Set flags if we are replacing PAT or SDT
-                    if (strncasecmp("pat", si_name, 3) == 0)
-                        self->is_si_pat = 1;
-                    else if (strncasecmp("pmt", si_name, 3) == 0)
-                        self->is_si_pmt = 1;
-                    else if (strncasecmp("sdt", si_name, 3) == 0)
-                        self->is_si_sdt = 1;
+                            #ifndef strncasecmp
+                            #define strncasecmp strnicmp
+                            #endif
 
-                    // Calculate the period and get the PID
-                    section->period = (self->muxrate * time) / (TSP_BYTES * 8 * 1000);
-                    // output one immediately
-                    section->packet_count = section->period - 1;
-                    mlt_log_verbose(NULL,
-                                    "SI %s time=%d period=%d file=%s\n",
-                                    si_name,
-                                    time,
-                                    section->period,
-                                    filename);
-                    section->pid = mlt_properties_get_int(properties, si_pid);
+                            // Set flags if we are replacing PAT or SDT
+                            if (strncasecmp("pat", si_name, 3) == 0)
+                                self->is_si_pat = 1;
+                            else if (strncasecmp("pmt", si_name, 3) == 0)
+                                self->is_si_pmt = 1;
+                            else if (strncasecmp("sdt", si_name, 3) == 0)
+                                self->is_si_sdt = 1;
 
-                    mlt_properties_set_data(si_properties,
+                            // Calculate the period and get the PID
+                            section->period = (self->muxrate * time) / (TSP_BYTES * 8 * 1000);
+                            // output one immediately
+                            section->packet_count = section->period - 1;
+                            mlt_log_verbose(NULL,
+                                            "SI %s time=%d period=%d file=%s\n",
                                             si_name,
-                                            section,
-                                            section->size,
-                                            free,
-                                            NULL);
+                                            time,
+                                            section->period,
+                                            filename);
+                            section->pid = mlt_properties_get_int(properties, si_pid);
+
+                            mlt_properties_set_data(si_properties,
+                                                    si_name,
+                                                    section,
+                                                    section->size,
+                                                    free,
+                                                    NULL);
+                            free(si_time);
+                        }
+                    }
                 }
+                free(si_name);
+                free(si_pid);
             }
-            free(si_name);
         }
     }
 }
@@ -431,12 +441,19 @@ static double measure_bitrate(consumer_cbrts self, uint64_t pcr, int drop)
     return muxrate;
 }
 
+#ifdef _WIN32
+#define WRITE_FUNC _write
+#else
+#define WRITE_FUNC write
+#endif
+
 static int writen(consumer_cbrts self, const void *buf, size_t count)
 {
     int result = 0;
     int written = 0;
     while (written < count) {
-        if ((result = write(self->fd, buf + written, count - written)) < 0) {
+        size_t to_write = count - written;
+        if ((result = WRITE_FUNC(self->fd, (const char*)buf + written, to_write)) < 0) {
             mlt_log_error(MLT_CONSUMER_SERVICE(&self->parent),
                           "Failed to write: %s\n",
                           strerror(errno));

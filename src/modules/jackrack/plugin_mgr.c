@@ -23,7 +23,6 @@
  */
 
 #include <ctype.h>
-#include <dirent.h>
 // #include <dirent.h>
 #include "win32/dirent.h"
 #include <dlfcn.h>
@@ -31,11 +30,14 @@
 #include <ladspa.h>
 #include <math.h>
 #include <stdio.h>
-#include <stdlib.h>
+// #include <stdlib.h>
 // #include <string.h>
 #include "win32/string.h"
 // #include <strings.h>
 #include <sys/stat.h>
+#ifndef S_ISDIR // like on MSVC
+#define S_ISDIR(mode) (((mode) & S_IFMT) == S_IFDIR)
+#endif
 #include <sys/types.h>
 // #include <unistd.h>
 #include "win32/unistd.h"

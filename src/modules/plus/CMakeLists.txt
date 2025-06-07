@@ -41,7 +41,14 @@ add_custom_target(Other_plus_Files SOURCES
 
 target_compile_options(mltplus PRIVATE ${MLT_COMPILE_OPTIONS})
 
-target_link_libraries(mltplus PRIVATE mlt m Threads::Threads)
+target_link_libraries(mltplus PRIVATE mlt Threads::Threads)
+
+if(MSVC)
+  set(PTHREAD_LIB_PATH "${CMAKE_INSTALL_PREFIX}/lib/pthreadVC3.lib")
+  target_link_libraries(mltplus PRIVATE ${PTHREAD_LIB_PATH})
+else()
+  target_link_libraries(mltplus PRIVATE m)
+endif()
 
 if(TARGET PkgConfig::FFTW)
   target_sources(mltplus PRIVATE filter_dance.c filter_fft.c)

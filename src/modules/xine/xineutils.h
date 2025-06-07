@@ -32,9 +32,9 @@ extern "C" {
 #include <stdarg.h>
 #include <inttypes.h>
 #include <pthread.h>
-#if HAVE_LIBGEN_H
-#  include <libgen.h>
-#endif
+// #if HAVE_LIBGEN_H
+// #  include <libgen.h>
+// #endif
 
 //#ifdef XINE_COMPILE
 #  include "attributes.h"
@@ -717,11 +717,14 @@ static inline char *_private_strsep(char **stringp, const char *delim) {
 #define	xine_setenv	setenv
 #else
 static inline void _private_setenv(const char *name, const char *val, int _xx) {
-  int  len  = strlen(name) + strlen(val) + 2;
-  char env[len];
 
-  sprintf(env, "%s%c%s", name, '=', val);
-  putenv(env);
+  char *env = malloc(strlen(name) + strlen(val) + 2);
+
+  if (env) {
+    sprintf(env, "%s%c%s", name, '=', val);
+    putenv(env);
+    // Note: Don't free(env) here as putenv takes ownership of the string
+  }
 }
 #define	xine_setenv	_private_setenv
 #endif

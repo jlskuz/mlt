@@ -80,7 +80,21 @@ target_sources(mlt PRIVATE ${MLT_PUBLIC_HEADERS})
 
 target_compile_options(mlt PRIVATE ${MLT_COMPILE_OPTIONS})
 
-target_link_libraries(mlt PRIVATE m Threads::Threads ${CMAKE_DL_LIBS})
+# if(MSVC)
+#     set_target_properties(mlt PROPERTIES
+#         LINK_FLAGS "/IMPLIB:${CMAKE_BINARY_DIR}/out/lib/mlt-7.lib"
+#     )
+# endif()
+
+if(MSVC)
+  set(PTHREAD_LIB_PATH "${CMAKE_INSTALL_PREFIX}/lib/pthreadVC3.lib")
+  target_link_libraries(mlt PRIVATE ${CMAKE_DL_LIBS} ${PTHREAD_LIB_PATH})
+  set_target_properties(mlt PROPERTIES
+    WINDOWS_EXPORT_ALL_SYMBOLS ON
+  )
+else()
+  target_link_libraries(mlt PRIVATE m Threads::Threads ${CMAKE_DL_LIBS})
+endif()
 
 target_include_directories(mlt PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>
@@ -99,14 +113,18 @@ if(WIN32)
     target_link_options(mlt PRIVATE -Wl,--output-def,${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/libmlt-${MLT_VERSION_MAJOR}.def)
     install(FILES "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/libmlt-${MLT_VERSION_MAJOR}.def" DESTINATION ${CMAKE_INSTALL_LIBDIR})
   endif()
-  target_sources(mlt PRIVATE ../win32/win32.c ../win32/strptime.c)
+  if(NOT MSVC)
+    target_sources(mlt PRIVATE ../win32/win32.c ../win32/strptime.c)
+  else()
+    target_sources(mlt PRIVATE ../win32/win32.c ../win32/libgen.c ../win32/dirent.c ../win32/unistd.c ../win32/sys_time.c)
+  endif()
   target_link_libraries(mlt PRIVATE Iconv::Iconv)
   if(NOT WINDOWS_DEPLOY)
     target_compile_definitions(mlt PRIVATE NODEPLOY)
   endif()
 endif()
 
-if(NOT (WIN32 OR RELOCATABLE))
+if(NOT (MINGW OR RELOCATABLE))
   if(APPLE)
     target_compile_definitions(mlt PRIVATE PREFIX_DATA="${CMAKE_INSTALL_FULL_DATADIR}/mlt" PREFIX_LIB="${CMAKE_INSTALL_FULL_LIBDIR}/mlt")
   else()

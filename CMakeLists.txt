@@ -158,6 +158,12 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif ()
 
 if(MSVC)
+  set(CMAKE_C_FLAGS "${CMAKE_CXX_FLAGS} /experimental:c11atomics")
+endif()
+
+include_directories("${CMAKE_INSTALL_PREFIX}/include")
+
+if(MSVC)
   list(APPEND MLT_COMPILE_OPTIONS "$<$<CONFIG:Release>:/fp:fast>")
 elseif(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
   list(APPEND MLT_COMPILE_OPTIONS "$<$<CONFIG:Release>:-ffast-math>")

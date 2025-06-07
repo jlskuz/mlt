@@ -55,7 +55,17 @@ add_custom_target(Other_core_Files SOURCES
 
 target_compile_options(mltcore PRIVATE ${MLT_COMPILE_OPTIONS})
 
-target_link_libraries(mltcore PRIVATE m mlt Threads::Threads)
+target_link_libraries(mltcore PRIVATE mlt Threads::Threads)
+
+if(MSVC)
+  set(PTHREAD_LIB_PATH "${CMAKE_INSTALL_PREFIX}/lib/pthreadVC3.lib")
+  target_link_libraries(mltcore PRIVATE ${PTHREAD_LIB_PATH})
+  # set_target_properties(mlt PROPERTIES
+  #   WINDOWS_EXPORT_ALL_SYMBOLS ON
+  # )
+else()
+  target_link_libraries(mltcore PRIVATE m)
+endif()
 
 if(WIN32)
   target_sources(mltcore PRIVATE ../../win32/fnmatch.c)

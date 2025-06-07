@@ -34,6 +34,7 @@
 #include <framework/mlt.h>
 
 #if (defined(__APPLE__) || defined(_WIN32) || defined(HAVE_SDL2)) && !defined(MELT_NOSDL)
+#define SDL_MAIN_HANDLED 1
 #include <SDL.h>
 #endif
 
@@ -743,7 +744,7 @@ static mlt_repository setup_factory(const char *repo_path, int set_locale)
     return repo;
 }
 
-int main(int argc, char **argv)
+int main(int argc, char *argv[])
 {
     int i;
     mlt_consumer consumer = NULL;

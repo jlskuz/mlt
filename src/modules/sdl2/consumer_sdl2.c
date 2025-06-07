@@ -36,7 +36,9 @@
 
 #undef MLT_IMAGE_FORMAT // only yuv422 working currently
 
-extern pthread_mutex_t mlt_sdl_mutex;
+__declspec(dllimport) extern pthread_mutex_t mlt_sdl_mutex;
+// pthread_mutex_t mlt_sdl_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 
 /** This classes definition.
 */

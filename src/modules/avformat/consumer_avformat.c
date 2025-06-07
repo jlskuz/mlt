@@ -1429,8 +1429,8 @@ static int encode_audio(encode_ctx_t *ctx)
 
                         while (--s) {
                             memcpy(dest, src, ctx->sample_bytes);
-                            dest += current_channels * ctx->sample_bytes;
-                            src += ctx->channels * ctx->sample_bytes;
+                            dest = (char*)dest + current_channels * ctx->sample_bytes;
+                            src = (char*)src + ctx->channels * ctx->sample_bytes;
                         }
                     }
                 }

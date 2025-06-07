@@ -33,6 +33,8 @@
 #include <pthread.h>
 // for nanosleep()
 #include <framework/mlt_types.h>
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
 #include <windows.h>
 #endif
 // #include <sys/time.h>

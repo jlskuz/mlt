@@ -71,6 +71,11 @@ target_compile_options(mlt++ PRIVATE ${MLT_COMPILE_OPTIONS})
 
 target_link_libraries(mlt++ PUBLIC mlt)
 
+if(MSVC)
+  set(PTHREAD_LIB_PATH "${CMAKE_INSTALL_PREFIX}/lib/pthreadVC3.lib")
+  target_link_libraries(mlt PRIVATE ${PTHREAD_LIB_PATH})
+endif()
+
 target_include_directories(mlt++ PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/mlt-${MLT_VERSION_MAJOR}/mlt++>
