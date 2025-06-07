@@ -137,12 +137,12 @@ static int filter_get_audio(mlt_frame frame,
             }
         } else if (*format == mlt_audio_s32) {
             int32_t *flin = *buffer;
-            int32_t *frin = *buffer + (*samples * sizeof(float));
-            int32_t *cin = *buffer + (2 * *samples * sizeof(float));
-            int32_t *slin = *buffer + (4 * *samples * sizeof(float));
-            int32_t *srin = *buffer + (5 * *samples * sizeof(float));
+            int32_t *frin = (int32_t*)((char*)*buffer + (*samples * sizeof(float)));
+            int32_t *cin = (int32_t*)((char*)*buffer + (2 * *samples * sizeof(float)));
+            int32_t *slin = (int32_t*)((char*)*buffer + (4 * *samples * sizeof(float)));
+            int32_t *srin = (int32_t*)((char*)*buffer + (5 * *samples * sizeof(float)));
             int32_t *lout = *buffer;
-            int32_t *rout = *buffer + (*samples * sizeof(float));
+            int32_t *rout = (int32_t*)((char*)*buffer + (*samples * sizeof(float)));
             int i;
             for (i = 0; i < *samples; i++) {
                 double fl = *flin++;
@@ -155,12 +155,12 @@ static int filter_get_audio(mlt_frame frame,
             }
         } else if (*format == mlt_audio_float) {
             float *flin = *buffer;
-            float *frin = *buffer + (*samples * sizeof(float));
-            float *cin = *buffer + (2 * *samples * sizeof(float));
-            float *slin = *buffer + (4 * *samples * sizeof(float));
-            float *srin = *buffer + (5 * *samples * sizeof(float));
+            int32_t *frin = (int32_t*)((char*)*buffer + (*samples * sizeof(float)));
+            int32_t *cin = (int32_t*)((char*)*buffer + (2 * *samples * sizeof(float)));
+            int32_t *slin = (int32_t*)((char*)*buffer + (4 * *samples * sizeof(float)));
+            int32_t *srin = (int32_t*)((char*)*buffer + (5 * *samples * sizeof(float)));
             float *lout = *buffer;
-            float *rout = *buffer + (*samples * sizeof(float));
+            int32_t *rout = (int32_t*)((char*)*buffer + (*samples * sizeof(float)));
             int i;
             for (i = 0; i < *samples; i++) {
                 float fl = *flin++;
