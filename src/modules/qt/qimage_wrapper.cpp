@@ -42,7 +42,8 @@
 #include <cmath>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <unistd.h>
+// #include <unistd.h>
+#include "win32/unistd.h"
 
 extern "C" {
 

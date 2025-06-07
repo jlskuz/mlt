@@ -31,9 +31,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/time.h>
+// #include <sys/time.h>
+#include "win32/sys_time.h"
 #include <time.h>
-#include <unistd.h>
+#include "win32/unistd.h"
+// #include <unistd.h>
 
 // avformat header files
 #include <libavcodec/avcodec.h>
@@ -1427,8 +1429,8 @@ static int encode_audio(encode_ctx_t *ctx)
 
                         while (--s) {
                             memcpy(dest, src, ctx->sample_bytes);
-                            dest += current_channels * ctx->sample_bytes;
-                            src += ctx->channels * ctx->sample_bytes;
+                            dest = (char*)dest + current_channels * ctx->sample_bytes;
+                            src = (char*)src + ctx->channels * ctx->sample_bytes;
                         }
                     }
                 }

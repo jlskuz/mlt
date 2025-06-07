@@ -22,7 +22,6 @@
 #include "mlt.h"
 #include "mlt_repository.h"
 
-#include <libgen.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -57,7 +56,8 @@
 /** the default subdirectory of the install prefix for holding module (plugin) data */
 #define PREFIX_DATA "/Resources/mlt"
 #else
-#include <unistd.h>
+// #include <unistd.h>
+#include "win32/unistd.h"
 #define PREFIX_LIB "/lib/mlt-7"
 /** the default subdirectory of the install prefix for holding module (plugin) data */
 #define PREFIX_DATA "/share/mlt-7"

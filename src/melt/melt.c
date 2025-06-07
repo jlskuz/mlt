@@ -20,7 +20,8 @@
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
-#include <libgen.h>
+#include "win32/libgen.h"
+// #include <libgen.h>
 #include <limits.h>
 #include <locale.h>
 #include <sched.h>
@@ -28,11 +29,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
+#include "win32/unistd.h"
 
 #include <framework/mlt.h>
 
 #if (defined(__APPLE__) || defined(_WIN32) || defined(HAVE_SDL2)) && !defined(MELT_NOSDL)
+#define SDL_MAIN_HANDLED 1
 #include <SDL.h>
 #endif
 
@@ -742,7 +744,7 @@ static mlt_repository setup_factory(const char *repo_path, int set_locale)
     return repo;
 }
 
-int main(int argc, char **argv)
+int main(int argc, char *argv[])
 {
     int i;
     mlt_consumer consumer = NULL;

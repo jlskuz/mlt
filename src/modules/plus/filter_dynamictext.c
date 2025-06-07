@@ -19,14 +19,16 @@
 
 #include <framework/mlt.h>
 
-#include <libgen.h> // for basename()
+// #include <libgen.h> // for basename()
+#include "win32/libgen.h"    // for basename()
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>  // for stat()
 #include <sys/types.h> // for stat()
 #include <time.h>      // for strftime() and gtime()
-#include <unistd.h>    // for stat()
+// #include <unistd.h>    // for stat()
+#include "win32/unistd.h"    // for stat()
 
 #define MAX_TEXT_LEN 512
 

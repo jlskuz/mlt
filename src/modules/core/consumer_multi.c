@@ -22,7 +22,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/time.h>
+// #include <sys/time.h>
+#include "win32/sys_time.h"
 
 // Forward references
 static int start(mlt_consumer consumer);

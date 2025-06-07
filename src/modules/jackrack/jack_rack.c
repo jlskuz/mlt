@@ -24,7 +24,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <strings.h>
+// #include <strings.h>
+#include "win32/strings.h"
 #include <string.h>
 #include <ctype.h>
 

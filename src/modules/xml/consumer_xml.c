@@ -26,7 +26,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
+// #include <unistd.h>
+#include "win32/unistd.h"
 
 #define ID_SIZE 128
 #define TIME_PROPERTY "_consumer_xml"

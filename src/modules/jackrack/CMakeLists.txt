@@ -9,6 +9,11 @@ target_compile_options(mltjackrack PRIVATE ${MLT_COMPILE_OPTIONS})
 
 target_link_libraries(mltjackrack PRIVATE mlt Threads::Threads)
 
+if(MSVC)
+  set(PTHREAD_LIB_PATH "${CMAKE_INSTALL_PREFIX}/lib/pthreadVC3.lib")
+  target_link_libraries(mltjackrack PRIVATE ${PTHREAD_LIB_PATH})
+endif()
+
 if(TARGET JACK::JACK)
   target_sources(mltjackrack PRIVATE consumer_jack.c)
   target_link_libraries(mltjackrack PRIVATE JACK::JACK)
@@ -38,7 +43,10 @@ if(GPL AND TARGET PkgConfig::xml AND TARGET PkgConfig::glib AND ladspa_h_FOUND)
     producer_ladspa.c
     filter_ladspa.c
   )
-  target_link_libraries(mltjackrack PRIVATE ${CMAKE_DL_LIBS} m PkgConfig::xml PkgConfig::glib)
+  target_link_libraries(mltjackrack PRIVATE ${CMAKE_DL_LIBS} PkgConfig::xml PkgConfig::glib)
+  if(NOT MSVC)
+    target_link_libraries(mltjackrack PRIVATE m)
+  endif()
   target_compile_definitions(mltjackrack PRIVATE GPL)
   if(RELOCATABLE)
     target_compile_definitions(mltjackrack PRIVATE RELOCATABLE)

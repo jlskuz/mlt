@@ -31,8 +31,10 @@
 #include "mlt_log.h"
 #include "mlt_property.h"
 
+#include "win32/dirent.h"
+
 #include <ctype.h>
-#include <dirent.h>
+//#include <dirent.h>
 #include <errno.h>
 #include <float.h>
 #include <locale.h>

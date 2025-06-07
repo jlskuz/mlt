@@ -27,7 +27,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
-#include <unistd.h>
+// #include <unistd.h>
+#include "win32/unistd.h"
 
 static void load_filenames(producer_qimage self, mlt_properties producer_properties);
 static int producer_get_frame(mlt_producer parent, mlt_frame_ptr frame, int index);

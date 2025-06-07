@@ -47,6 +47,7 @@ typedef struct
 } gps_point_proc;
 
 //0 is a valid value for many fields, use GPS_UNINIT (-9999) to differentiate missing values
+#if __cplusplus >= 202002L
 static const gps_point_raw uninit_gps_raw_point = {.lat = GPS_UNINIT,
                                                    .lon = GPS_UNINIT,
                                                    .speed = GPS_UNINIT,
@@ -79,7 +80,15 @@ static const gps_point_proc uninit_gps_proc_point = {.lat = GPS_UNINIT,
                                                      .dist_down = GPS_UNINIT,
                                                      .dist_flat = GPS_UNINIT,
                                                      .grade_p = GPS_UNINIT};
+#else
+static const gps_point_raw uninit_gps_raw_point = { GPS_UNINIT, GPS_UNINIT, GPS_UNINIT, GPS_UNINIT, GPS_UNINIT,
+                                                    GPS_UNINIT, GPS_UNINIT, GPS_UNINIT, GPS_UNINIT, GPS_UNINIT};
 
+static const gps_point_proc uninit_gps_proc_point = { GPS_UNINIT, GPS_UNINIT, GPS_UNINIT, GPS_UNINIT, GPS_UNINIT,
+                                                      GPS_UNINIT, GPS_UNINIT, GPS_UNINIT, GPS_UNINIT, GPS_UNINIT,
+                                                      GPS_UNINIT, GPS_UNINIT, GPS_UNINIT, GPS_UNINIT, GPS_UNINIT,
+                                                      GPS_UNINIT, GPS_UNINIT, GPS_UNINIT, GPS_UNINIT};
+#endif
 //structure used to ease argument passing between filter and GPS parser api
 typedef struct
 {

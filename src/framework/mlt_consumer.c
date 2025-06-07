@@ -27,11 +27,12 @@
 #include "mlt_producer.h"
 #include "mlt_profile.h"
 
-#include <stdatomic.h>
+#include "atomic_compat.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/time.h>
+// #include <sys/time.h>
+#include "win32/sys_time.h"
 
 /** Define this if you want an automatic deinterlace (if necessary) when the
  * consumer's producer is not running at normal speed.
@@ -40,7 +41,7 @@
 
 /** This is not the ideal place for this, but it is needed by VDPAU as well.
  */
-pthread_mutex_t mlt_sdl_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t __declspec(dllexport) mlt_sdl_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /** mlt_frame_s::is_processing can not be made atomic, so protect it with a mutex.
  */

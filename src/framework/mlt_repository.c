@@ -26,13 +26,17 @@
 #include "mlt_properties.h"
 #include "mlt_tokeniser.h"
 
-#include <dirent.h>
+// #include <dirent.h>
+#include "win32/dirent.h"
 #include <dlfcn.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#ifndef S_ISDIR // like on MSVC
+#define S_ISDIR(mode) (((mode) & S_IFMT) == S_IFDIR)
+#endif
 
 /** \brief Repository class
  *
@@ -148,9 +152,18 @@ mlt_repository mlt_repository_init(const char *directory)
 
         // Open the shared object
         void *object = dlopen(object_name, flags);
+
+        if (object == NULL) {
+            mlt_log_debug(NULL, "%s: could not dlopen %s\n", __FUNCTION__, object_name);
+        }
+
         if (object != NULL) {
             // Get the registration function
             mlt_repository_callback symbol_ptr = dlsym(object, "mlt_register");
+
+            if (symbol_ptr == NULL) {
+                mlt_log_debug(NULL, "%s: could not register %s\n", __FUNCTION__, object_name);
+            }
 
             // Call the registration function
             if (symbol_ptr != NULL) {

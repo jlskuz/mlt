@@ -50,12 +50,19 @@ function(mlt_add_qt_module ARG_TARGET)
     target_link_libraries(${ARG_TARGET} PRIVATE
       mlt++
       mlt
-      m
       Threads::Threads
       Qt${ARG_QT_VERSION}::Core
       Qt${ARG_QT_VERSION}::Gui
       Qt${ARG_QT_VERSION}::Xml
     )
+
+if(MSVC)
+    set(PTHREAD_LIB_PATH "${CMAKE_INSTALL_PREFIX}/lib/pthreadVC3.lib")
+    target_link_libraries(${ARG_TARGET} PRIVATE ${PTHREAD_LIB_PATH})
+    target_sources(${ARG_TARGET} PRIVATE ../../win32/strptime.c ../../win32/sys_time.c)
+else()
+    target_link_libraries(${ARG_TARGET} PRIVATE m)
+endif()
 
     if(ARG_QT_VERSION EQUAL 6)
       target_link_libraries(${ARG_TARGET} PRIVATE

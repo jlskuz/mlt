@@ -25,6 +25,11 @@ else()
   target_include_directories(mltdecklink PRIVATE linux)
 endif()
 
+if(WIN32)
+  target_sources(mltcore PRIVATE ../../win32/dirent.c ../../win32/sys_time.c)
+  target_include_directories(mltcore PRIVATE ../../win32)
+endif()
+
 if(CPU_SSE)
   target_compile_definitions(mltdecklink PRIVATE USE_SSE)
 endif()

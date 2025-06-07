@@ -11,6 +11,11 @@ target_compile_options(mltrtaudio PRIVATE ${MLT_COMPILE_OPTIONS})
 
 target_link_libraries(mltrtaudio PRIVATE mlt Threads::Threads)
 
+if(MSVC)
+  set(PTHREAD_LIB_PATH "${CMAKE_INSTALL_PREFIX}/lib/pthreadVC3.lib")
+  target_link_libraries(mltrtaudio PRIVATE ${PTHREAD_LIB_PATH})
+endif()
+
 if(TARGET PkgConfig::rtaudio)
   target_link_libraries(mltrtaudio PRIVATE PkgConfig::rtaudio)
 else()

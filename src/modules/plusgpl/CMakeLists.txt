@@ -17,7 +17,14 @@ add_custom_target(Other_plsugpl_Files SOURCES
 
 target_compile_options(mltplusgpl PRIVATE ${MLT_COMPILE_OPTIONS})
 
-target_link_libraries(mltplusgpl PRIVATE mlt m Threads::Threads)
+target_link_libraries(mltplusgpl PRIVATE mlt Threads::Threads)
+
+if(MSVC)
+  set(PTHREAD_LIB_PATH "${CMAKE_INSTALL_PREFIX}/lib/pthreadVC3.lib")
+  target_link_libraries(mltplusgpl PRIVATE ${PTHREAD_LIB_PATH})
+else()
+  target_link_libraries(mltplusgpl PRIVATE m)
+endif()
 
 if(WIN32)
   target_link_libraries(mltplusgpl PRIVATE ws2_32)

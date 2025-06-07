@@ -24,7 +24,7 @@
 #include "mlt_deque.h"
 
 // System header files
-#include <stdatomic.h>
+#include "atomic_compat.h"
 #include <stdlib.h>
 #include <string.h>
 

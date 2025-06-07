@@ -31,9 +31,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/time.h>
+// #include <sys/time.h>
+#include "win32/sys_time.h"
 
-extern pthread_mutex_t mlt_sdl_mutex;
+__declspec(dllimport) extern pthread_mutex_t mlt_sdl_mutex;
+// pthread_mutex_t mlt_sdl_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /** This classes definition.
 */

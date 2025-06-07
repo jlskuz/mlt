@@ -17,12 +17,21 @@ target_compile_options(mltavformat PRIVATE ${MLT_COMPILE_OPTIONS})
 
 target_link_libraries(mltavformat PRIVATE
   mlt
-  m
   Threads::Threads
   PkgConfig::libavformat
   PkgConfig::libswscale
   PkgConfig::libavutil
 )
+
+if(MSVC)
+  set(PTHREAD_LIB_PATH "${CMAKE_INSTALL_PREFIX}/lib/pthreadVC3.lib")
+  target_link_libraries(mltavformat PRIVATE ${CMAKE_DL_LIBS} ${PTHREAD_LIB_PATH})
+  set_target_properties(mlt PROPERTIES
+    WINDOWS_EXPORT_ALL_SYMBOLS ON
+  )
+else()
+  target_link_libraries(mltavformat PRIVATE m)
+endif()
 
 target_compile_definitions(mltavformat PRIVATE FILTERS)
 

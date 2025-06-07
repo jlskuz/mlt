@@ -27,7 +27,8 @@
 #include <framework/mlt_log.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
+// #include <unistd.h>
+#include "win32/unistd.h"
 
 #include <libxml/parser.h>
 #include <libxml/parserInternals.h> // for xmlCreateFileParserCtxt

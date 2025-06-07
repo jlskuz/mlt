@@ -80,17 +80,25 @@ void mlt_log(void *service, int level, const char *fmt, ...)
 void mlt_log(void *service, int level, const char *fmt, ...);
 #endif
 
-#define mlt_log_panic(service, format, args...) mlt_log((service), MLT_LOG_PANIC, (format), ##args)
-#define mlt_log_fatal(service, format, args...) mlt_log((service), MLT_LOG_FATAL, (format), ##args)
-#define mlt_log_error(service, format, args...) mlt_log((service), MLT_LOG_ERROR, (format), ##args)
-#define mlt_log_warning(service, format, args...) \
-    mlt_log((service), MLT_LOG_WARNING, (format), ##args)
-#define mlt_log_info(service, format, args...) mlt_log((service), MLT_LOG_INFO, (format), ##args)
-#define mlt_log_verbose(service, format, args...) \
-    mlt_log((service), MLT_LOG_VERBOSE, (format), ##args)
-#define mlt_log_timings(service, format, args...) \
-    mlt_log((service), MLT_LOG_TIMINGS, (format), ##args)
-#define mlt_log_debug(service, format, args...) mlt_log((service), MLT_LOG_DEBUG, (format), ##args)
+
+#define mlt_log_panic(service, ...) mlt_log(service, MLT_LOG_PANIC, __VA_ARGS__)
+#define mlt_log_fatal(service, ...) mlt_log(service, MLT_LOG_FATAL, __VA_ARGS__)
+#define mlt_log_error(service, ...) mlt_log(service, MLT_LOG_ERROR, __VA_ARGS__)
+#define mlt_log_warning(service, ...) mlt_log(service, MLT_LOG_WARNING, __VA_ARGS__)
+#define mlt_log_info(service, ...) mlt_log(service, MLT_LOG_INFO, __VA_ARGS__)
+#define mlt_log_verbose(service, ...) mlt_log(service, MLT_LOG_VERBOSE, __VA_ARGS__)
+#define mlt_log_timings(service, ...) mlt_log(service, MLT_LOG_TIMINGS, __VA_ARGS__)
+#define mlt_log_debug(service, ...) mlt_log(service, MLT_LOG_DEBUG, __VA_ARGS__)
+
+// // Original definitions for non-MSVC compilers
+// #define mlt_log_panic(service, format, args...) mlt_log((service), MLT_LOG_PANIC, (format), ##args)
+// #define mlt_log_fatal(service, format, args...) mlt_log((service), MLT_LOG_FATAL, (format), ##args)
+// #define mlt_log_error(service, format, args...) mlt_log((service), MLT_LOG_ERROR, (format), ##args)
+// #define mlt_log_warning(service, format, args...) mlt_log((service), MLT_LOG_WARNING, (format), ##args)
+// #define mlt_log_info(service, format, args...) mlt_log((service), MLT_LOG_INFO, (format), ##args)
+// #define mlt_log_verbose(service, format, args...) mlt_log((service), MLT_LOG_VERBOSE, (format), ##args)
+// #define mlt_log_timings(service, format, args...) mlt_log((service), MLT_LOG_TIMINGS, (format), ##args)
+// #define mlt_log_debug(service, format, args...) mlt_log((service), MLT_LOG_DEBUG, (format), ##args)
 
 void mlt_vlog(void *service, int level, const char *fmt, va_list);
 int mlt_log_get_level(void);
