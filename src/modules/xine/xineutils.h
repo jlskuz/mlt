@@ -25,7 +25,8 @@
 extern "C" {
 #endif
 
-#include <unistd.h>
+// #include <unistd.h>
+#include "win32/unistd.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>

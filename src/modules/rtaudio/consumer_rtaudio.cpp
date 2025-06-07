@@ -21,7 +21,9 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/time.h>
+// #include <sys/time.h>
+#include "win32/sys_time.h"
+
 #ifdef USE_INTERNAL_RTAUDIO
 #include "RtAudio.h"
 #else

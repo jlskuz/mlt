@@ -31,9 +31,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/time.h>
+// #include <sys/time.h>
+#include "win32/sys_time.h"
 #include <time.h>
-#include <unistd.h>
+#include "win32/unistd.h"
+// #include <unistd.h>
 
 // avformat header files
 #include <libavcodec/avcodec.h>

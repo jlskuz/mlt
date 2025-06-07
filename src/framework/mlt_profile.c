@@ -22,7 +22,8 @@
 
 #include "mlt.h"
 
-#include <libgen.h>
+#include "win32/libgen.h"
+// #include <libgen.h>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>

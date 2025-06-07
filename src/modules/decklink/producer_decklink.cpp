@@ -23,8 +23,10 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/time.h>
-#include <unistd.h>
+// #include <sys/time.h>
+#include "win32/sys_time.h"
+// #include <unistd.h>
+#include "win32/unistd.h"
 
 #include <framework/mlt_slices.h>
 

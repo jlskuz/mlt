@@ -33,8 +33,8 @@
 #include <sys/stat.h>  // for stat()
 #include <sys/types.h> // for stat()
 #include <time.h>      // for strftime() and gtime()
-#include <unistd.h>    // for stat()
-
+// #include <unistd.h>    // for stat()
+#include "win32/unistd.h"
 /* Forward references. */
 
 static int producer_get_frame(mlt_service self, mlt_frame_ptr frame, int index);

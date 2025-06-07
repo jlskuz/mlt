@@ -20,7 +20,8 @@
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
-#include <libgen.h>
+#include "win32/libgen.h"
+// #include <libgen.h>
 #include <limits.h>
 #include <locale.h>
 #include <sched.h>
@@ -28,7 +29,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
+#include "win32/unistd.h"
 
 #include <framework/mlt.h>
 

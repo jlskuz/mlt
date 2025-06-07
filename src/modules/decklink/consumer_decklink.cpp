@@ -24,8 +24,10 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/time.h>
-#include <unistd.h>
+// #include <sys/time.h>
+#include "win32/sys_time.h"
+// #include <unistd.h>
+#include "win32/unistd.h"
 
 #define SWAB_SLICED_ALIGN_POW 5
 static int swab_sliced(int id, int idx, int jobs, void *cookie)

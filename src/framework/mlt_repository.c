@@ -26,7 +26,8 @@
 #include "mlt_properties.h"
 #include "mlt_tokeniser.h"
 
-#include <dirent.h>
+// #include <dirent.h>
+#include "win32/dirent.h"
 #include <dlfcn.h>
 #include <limits.h>
 #include <stdio.h>

@@ -24,7 +24,8 @@
 
 #include <string.h>
 #ifndef NDEBUG
-#include <sys/time.h>
+// #include <sys/time.h>
+#include "win32/sys_time.h"
 #include <time.h>
 #endif
 

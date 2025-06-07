@@ -28,7 +28,8 @@
 #include <pthread.h>
 #include <sched.h>
 #include <stdlib.h>
-#include <unistd.h>
+// #include <unistd.h>
+#include "win32/unistd.h"
 #ifdef _WIN32
 #include <windows.h>
 #endif

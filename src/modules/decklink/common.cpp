@@ -19,7 +19,8 @@
 
 #include "common.h"
 #include <stdlib.h>
-#include <unistd.h>
+// #include <unistd.h>
+#include "win32/unistd.h"
 
 #ifdef __APPLE__
 

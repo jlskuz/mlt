@@ -24,17 +24,21 @@
 
 #include <ctype.h>
 #include <dirent.h>
+// #include <dirent.h>
+#include "win32/dirent.h"
 #include <dlfcn.h>
 #include <errno.h>
 #include <ladspa.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <strings.h>
+// #include <string.h>
+#include "win32/string.h"
+// #include <strings.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <unistd.h>
+// #include <unistd.h>
+#include "win32/unistd.h"
 
 #include "framework/mlt_factory.h"
 #include "framework/mlt_log.h"

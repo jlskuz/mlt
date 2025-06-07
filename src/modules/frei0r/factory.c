@@ -22,14 +22,16 @@
 #include <frei0r.h>
 #include <string.h>
 
-#include <dirent.h>
+// #include <dirent.h>
+#include "win32/dirent.h"
 #include <dlfcn.h>
 #include <limits.h>
 #include <math.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/stat.h>
+#include "win32/sys_stat.h"
+// #include <sys/stat.h>
 #include <sys/types.h>
 
 #ifdef _WIN32

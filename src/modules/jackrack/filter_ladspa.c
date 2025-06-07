@@ -24,7 +24,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
-#include <unistd.h>
+// #include <unistd.h>
+#include "win32/unistd.h"
 
 #include <pthread.h>
 #include <string.h>

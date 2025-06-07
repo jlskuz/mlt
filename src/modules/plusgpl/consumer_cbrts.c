@@ -34,9 +34,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
-#include <unistd.h>
+// #include <unistd.h>
+#include "win32/unistd.h"
 
-#include <strings.h>
+// #include <strings.h>
+#include "win32/strings.h"
 // includes for socket IO
 #if (_POSIX_C_SOURCE >= 1 || _XOPEN_SOURCE || _POSIX_SOURCE) && (_POSIX_TIMERS > 0)
 #if !(defined(__FreeBSD_kernel__) && defined(__GLIBC__))
@@ -48,7 +50,8 @@
 #include <sys/types.h>
 #endif
 #endif
-#include <sys/time.h>
+// #include <sys/time.h>
+#include "win32/sys_time.h"
 #include <time.h>
 
 #define TSP_BYTES (188)
