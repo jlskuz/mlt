@@ -3,6 +3,7 @@
   "name": "mlt",
   "dependencies": [
     "pthreads",
-    "pkgconf"
+    "pkgconf",
+    "libiconv"
   ]
 }

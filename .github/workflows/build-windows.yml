@@ -22,7 +22,40 @@ jobs:
       - name: Configure C/C++ with CMake
         run: |
           echo $env:VCPKG_INSTALLATION_ROOT
-          cmake -D CMAKE_BUILD_TYPE=Debug -D BUILD_TESTING=ON -D SWIG_PYTHON=OFF -S . -B build -G Ninja -D CMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake
+          cmake \
+            -D CMAKE_BUILD_TYPE=Debug \
+            -D BUILD_TESTING=ON \
+            -D SWIG_PYTHON=OFF \
+            -S . \
+            -B build \
+            -G Ninja \
+            -D CMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake \
+            -D MOD_AVFORMAT=OFF \
+            -D MOD_DECKLINK=OFF \
+            -D MOD_FREI0R=OFF \
+            -D MOD_GDK=OFF \
+            -D MOD_JACKRACK=OFF \
+            -D USE_LV2=OFF \
+            -D USE_VST2=OFF \
+            -D MOD_KDENLIVE=OFF \
+            -D MOD_NDI=OFF \
+            -D MOD_NORMALIZE=OFF \
+            -D MOD_OLDFILM=OFF \
+            -D MOD_OPENCV=OFF \
+            -D MOD_MOVIT=OFF \
+            -D MOD_PLUS=OFF \
+            -D MOD_PLUSGPL=OFF \
+            -D MOD_QT6=OFF \
+            -D MOD_RESAMPLE=OFF \
+            -D MOD_RTAUDIO=OFF \
+            -D MOD_RUBBERBAND=OFF \
+            -D MOD_SDL2=OFF \
+            -D MOD_DOX=OFF \
+            -D MOD_VIDSTAB=OFF \
+            -D MOD_VORBIS=OFF \
+            -D MOD_XINE=OFF \
+            -D MOD_XML=OFF
+
       - name: Build with Ninja
         run: |
           cmake --build build
