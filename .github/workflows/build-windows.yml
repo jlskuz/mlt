@@ -1,0 +1,32 @@
+name: build-test-windows-on-push
+
+on: [push, pull_request]
+
+jobs:
+  build-cmake-msvc:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # - name: Add MSVC to PATH
+      #   uses: ilammy/msvc-dev-cmd@v1
+
+      # - name: Install CMake and Ninja
+      #   uses: lukka/get-cmake@v3.27.6
+      # - name: Setup anew (or from cache) vcpkg (and does not build any package)
+      #   uses: lukka/run-vcpkg@v11
+
+      # - name: Run CMake consuming CMakePreset.json and run vcpkg to build packages
+      #   uses: lukka/run-cmake@v10
+
+      - name: Configure C/C++ with CMake
+        run: |
+          cmake -D CMAKE_BUILD_TYPE=Debug -D BUILD_TESTING=ON -D SWIG_PYTHON=OFF -S . -B build -G Ninja
+          cmake --build build
+          sudo cmake --install build
+      - name: Build with Ninja
+        run: |
+          cmake --build build
+          cmake --install build
+      - name: Run tests
+        run: cd build && ctest --output-on-failure
