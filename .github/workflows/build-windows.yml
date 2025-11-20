@@ -21,7 +21,8 @@ jobs:
 
       - name: Configure C/C++ with CMake
         run: |
-          cmake -D CMAKE_BUILD_TYPE=Debug -D BUILD_TESTING=ON -D SWIG_PYTHON=OFF -S . -B build -G Ninja -D CMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake
+          echo $env:VCPKG_INSTALLATION_ROOT
+          cmake -D CMAKE_BUILD_TYPE=Debug -D BUILD_TESTING=ON -D SWIG_PYTHON=OFF -S . -B build -G Ninja -D CMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake
       - name: Build with Ninja
         run: |
           cmake --build build
