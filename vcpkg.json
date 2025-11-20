@@ -4,6 +4,7 @@
   "dependencies": [
     "pthreads",
     "pkgconf",
-    "libiconv"
+    "libiconv",
+    "dlfcn-win32"
   ]
 }
