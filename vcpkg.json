@@ -1,0 +1,10 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "mlt",
+  "dependencies": [
+    {
+      "name": "pthreads",
+      "version>=": "3.0.0"
+    }
+  ]
+}
