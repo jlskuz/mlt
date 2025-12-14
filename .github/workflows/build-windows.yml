@@ -1,0 +1,46 @@
+name: build-test-windows-on-push
+
+on: [push, pull_request]
+
+jobs:
+  build-cmake-msvc:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # - name: Install CMake and Ninja
+      #   uses: lukka/get-cmake@v3.27.6
+
+      - name: Restore from cache and setup vcpkg executable and data files.
+        uses: lukka/run-vcpkg@v11
+        env:
+          VCPKG_BINARY_SOURCES: default,rw
+        with:
+          vcpkgJsonGlob: 'vcpkg.json'
+
+      - name: Set up binary cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: ${{ runner.os }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
+          restore-keys: |
+            ${{ runner.os }}-vcpkg-binary-cache-
+
+      # - name: Add MSVC to PATH
+      - uses: ilammy/msvc-dev-cmd@v1
+
+      # - name: Run CMake consuming CMakePreset.json and run vcpkg to build packages
+      #   uses: lukka/run-cmake@v10
+
+      - name: Configure C/C++ with CMake
+        #cmake -D CMAKE_BUILD_TYPE=Debug -D BUILD_TESTING=ON -D SWIG_PYTHON=OFF
+        run: |
+          cmake --preset vcpkg-ninja
+      - name: Build with Ninja
+        run: |
+          cmake --build build
+      - name: Install MLT
+        run: |
+          cmake --install build
+      # - name: Run tests
+      #   run: cd build && ctest --output-on-failure
