@@ -323,8 +323,16 @@ else()
 endif()
 
 if(BUILD_TESTING)
+  set(BUILD_KWALIFY_TESTS ON)
+  if(MSVC)
+    # Kwalify is not available in vcpkg
+    set(BUILD_KWALIFY_TESTS OFF)
+  endif()
+
   find_package(Qt${QT_MAJOR_VERSION} REQUIRED COMPONENTS Core Test)
-  find_package(Kwalify REQUIRED)
+  if(BUILD_KWALIFY_TESTS)
+    find_package(Kwalify REQUIRED)
+  endif()
   enable_testing()
 endif()
 
