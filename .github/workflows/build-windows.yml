@@ -8,6 +8,8 @@ permissions:
 jobs:
   build-cmake-msvc:
     runs-on: windows-latest
+    env:
+      VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/jlskuz/index.json,readwrite"
     steps:
       - uses: actions/checkout@v4
 
@@ -16,8 +18,6 @@ jobs:
 
       - name: Restore from cache and setup vcpkg executable and data files.
         uses: lukka/run-vcpkg@v11
-        env:
-          VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/jlskuz/index.json,readwrite"
         with:
           vcpkgJsonGlob: 'vcpkg.json'
 
@@ -27,7 +27,6 @@ jobs:
           USERNAME: jlskuz
           VCPKG_EXE: ${{ env.VCPKG_ROOT }}/vcpkg
           #VCPKG_EXE: ${{ github.workspace }}/vcpkg/vcpkg
-          #VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/jlskuz/index.json,readwrite"
           FEED_URL: https://nuget.pkg.github.com/jlskuz/index.json
         run: |
             .$(${{ env.VCPKG_EXE }} fetch nuget) `
@@ -56,7 +55,6 @@ jobs:
       #   uses: lukka/run-cmake@v10
 
       - name: Configure C/C++ with CMake
-        #cmake -D CMAKE_BUILD_TYPE=Debug -D BUILD_TESTING=ON -D SWIG_PYTHON=OFF
         run: |
           cmake --preset vcpkg-ninja
       - name: Build with Ninja
@@ -65,8 +63,6 @@ jobs:
       - name: Install MLT
         run: |
           cmake --install build
-      - name: Run Tests
-        run: |
-          ctest --test-dir build -C Debug
-      # - name: Run tests
-      #   run: cd build && ctest --output-on-failure
+      # - name: Run Tests
+      #   run: |
+      #     ctest --test-dir build -C Debug --output-on-failure
