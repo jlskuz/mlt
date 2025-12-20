@@ -2,6 +2,9 @@ name: build-test-windows-on-push
 
 on: [push, pull_request]
 
+permissions:
+  packages: write
+
 jobs:
   build-cmake-msvc:
     runs-on: windows-latest
@@ -14,17 +17,37 @@ jobs:
       - name: Restore from cache and setup vcpkg executable and data files.
         uses: lukka/run-vcpkg@v11
         env:
-          VCPKG_BINARY_SOURCES: default,rw
+          VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/jlskuz/index.json,readwrite"
         with:
           vcpkgJsonGlob: 'vcpkg.json'
 
-      - name: Set up binary cache
-        uses: actions/cache@v5
-        with:
-          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
-          key: ${{ runner.os }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
-          restore-keys: |
-            ${{ runner.os }}-vcpkg-binary-cache-
+      - name: Add NuGet sources
+        shell: pwsh
+        env:
+          USERNAME: jlskuz
+          VCPKG_EXE: ${{ env.VCPKG_ROOT }}/vcpkg
+          #VCPKG_EXE: ${{ github.workspace }}/vcpkg/vcpkg
+          #VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/jlskuz/index.json,readwrite"
+          FEED_URL: https://nuget.pkg.github.com/jlskuz/index.json
+        run: |
+            .$(${{ env.VCPKG_EXE }} fetch nuget) `
+            sources add `
+            -Source "${{ env.FEED_URL }}" `
+            -StorePasswordInClearText `
+            -Name GitHubPackages `
+            -UserName "${{ env.USERNAME }}" `
+            -Password "${{ secrets.GITHUB_TOKEN }}"
+            .$(${{ env.VCPKG_EXE }} fetch nuget) `
+            setapikey "${{ secrets.GITHUB_TOKEN }}" `
+            -Source "${{ env.FEED_URL }}"
+
+      # - name: Set up binary cache
+      #   uses: actions/cache@v5
+      #   with:
+      #     path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+      #     key: ${{ runner.os }}-vcpkg-binary-cache-${{ hashFiles('vcpkg*.json') }}
+      #     restore-keys: |
+      #       ${{ runner.os }}-vcpkg-binary-cache-
 
       # - name: Add MSVC to PATH
       - uses: ilammy/msvc-dev-cmd@v1
